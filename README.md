@@ -183,6 +183,18 @@ Based on progressive tax brackets (federal + provincial):
 
 *Tax brackets are editable in Settings.*
 
+### Adding a New Tax Year
+
+The tax year dropdown in Settings automatically shows the **current year** and **previous year**. On January 1st, it updates to show the new year.
+
+**To set up a new tax year:**
+1. Go to **Settings** → **Tax Rates**
+2. Select the new year from the dropdown (it will appear empty)
+3. Add federal and provincial tax brackets using the **+** buttons
+4. Set your **Presumed Annual Income** for withholding calculations
+
+The app comes pre-seeded with 2025 and 2026 CRA tax brackets. When 2027 brackets are announced (typically late 2026), you'll need to add them manually.
+
 ## Backup & Restore
 
 Backups use PostgreSQL's native `pg_dump` format for complete database portability.

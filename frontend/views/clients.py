@@ -209,7 +209,7 @@ class ClientsView:
             actions_alignment=ft.MainAxisAlignment.END,
         )
         
-        self.page.dialog = dialog
+        self.page.overlay.append(dialog)
         
         # Build layout
         content = ft.Column(
