@@ -1,0 +1,8 @@
+# Flet Framework
+flet==0.24.1
+
+# HTTP Client
+httpx==0.27.2
+
+# Date/Time utilities
+python-dateutil==2.9.0

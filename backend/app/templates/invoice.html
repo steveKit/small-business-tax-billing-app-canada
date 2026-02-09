@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice {{ invoice_number }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #333;
+            padding: 40px;
+        }
+        
+        .invoice-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #2c3e50;
+        }
+        
+        .business-info h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .business-info p {
+            color: #666;
+            font-size: 11px;
+        }
+        
+        .invoice-title {
+            text-align: right;
+        }
+        
+        .invoice-title h2 {
+            font-size: 32px;
+            font-weight: 300;
+            color: #2c3e50;
+            letter-spacing: 2px;
+        }
+        
+        .invoice-meta {
+            margin-top: 10px;
+            font-size: 11px;
+            color: #666;
+        }
+        
+        .invoice-meta strong {
+            color: #333;
+        }
+        
+        /* Bill To Section */
+        .bill-to {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        .bill-to h3 {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #999;
+            margin-bottom: 10px;
+        }
+        
+        .bill-to .client-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        /* Description Table */
+        .description-table {
+            width: 100%;
+            margin-bottom: 30px;
+            border-collapse: collapse;
+        }
+        
+        .description-table th {
+            background-color: #2c3e50;
+            color: white;
+            padding: 12px 15px;
+            text-align: left;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .description-table th:last-child {
+            text-align: right;
+        }
+        
+        .description-table td {
+            padding: 20px 15px;
+            border-bottom: 1px solid #eee;
+            vertical-align: top;
+        }
+        
+        .description-table td:last-child {
+            text-align: right;
+            white-space: nowrap;
+        }
+        
+        .description-text {
+            font-size: 13px;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        /* Totals */
+        .totals {
+            float: right;
+            width: 300px;
+        }
+        
+        .totals-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .totals-table td {
+            padding: 8px 0;
+        }
+        
+        .totals-table td:first-child {
+            color: #666;
+        }
+        
+        .totals-table td:last-child {
+            text-align: right;
+            font-weight: 500;
+        }
+        
+        .totals-table .subtotal-row td {
+            border-bottom: 1px solid #eee;
+        }
+        
+        .totals-table .total-row td {
+            padding-top: 15px;
+            font-size: 16px;
+            font-weight: 700;
+            color: #2c3e50;
+            border-top: 2px solid #2c3e50;
+        }
+        
+        /* Payment Info */
+        .payment-info {
+            clear: both;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        
+        .payment-info h3 {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #999;
+            margin-bottom: 10px;
+        }
+        
+        .payment-info p {
+            color: #666;
+            font-size: 11px;
+            margin-bottom: 5px;
+        }
+        
+        /* Footer */
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            color: #999;
+            font-size: 10px;
+        }
+        
+        /* HST Number */
+        .hst-number {
+            margin-top: 10px;
+            font-size: 10px;
+            color: #999;
+        }
+
+        @media print {
+            body {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="invoice-container">
+        <!-- Header -->
+        <div class="header">
+            <div class="business-info">
+                <h1>{{ business_name }}</h1>
+                {% if business_address_line1 %}
+                <p>{{ business_address_line1 }}</p>
+                {% endif %}
+                {% if business_address_line2 %}
+                <p>{{ business_address_line2 }}</p>
+                {% endif %}
+                {% if business_city %}
+                <p>{{ business_city }}, {{ business_province }} {{ business_postal_code }}</p>
+                {% endif %}
+                {% if business_phone %}
+                <p>{{ business_phone }}</p>
+                {% endif %}
+                {% if business_email %}
+                <p>{{ business_email }}</p>
+                {% endif %}
+            </div>
+            <div class="invoice-title">
+                <h2>INVOICE</h2>
+                <div class="invoice-meta">
+                    <p><strong>Invoice #:</strong> {{ invoice_number }}</p>
+                    <p><strong>Date:</strong> {{ invoice_date }}</p>
+                    <p><strong>Due Date:</strong> {{ due_date }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Bill To -->
+        <div class="bill-to">
+            <h3>Bill To</h3>
+            <p class="client-name">{{ client_name }}</p>            
+            {% if client_address_line1 %}
+            <p>{{ client_address_line1 }}</p>
+            {% endif %}
+            {% if client_address_line2 %}
+            <p>{{ client_address_line2 }}</p>
+            {% endif %}
+            {% if client_city %}
+            <p>{{ client_city }}, {{ client_province }} {{ client_postal_code }}</p>
+            {% endif %}
+            {% if client_contact %}
+            <p>Attention: {{ client_contact }}</p>
+            {% endif %}
+            {% if client_email %}
+            <p>{{ client_email }}</p>
+            {% endif %}
+        </div>
+        
+        <!-- Description Table -->
+        <table class="description-table">
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>
+                        <div class="description-text">{{ description }}</div>
+                    </td>
+                    <td>{{ subtotal }}</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <!-- Totals -->
+        <div class="totals">
+            <table class="totals-table">
+                <tr class="subtotal-row">
+                    <td>Subtotal</td>
+                    <td>{{ subtotal }}</td>
+                </tr>
+                <tr>
+                    <td>{{ tax_type }} ({{ tax_rate_display }})</td>
+                    <td>{{ tax_amount }}</td>
+                </tr>
+                <tr class="total-row">
+                    <td>Total</td>
+                    <td>{{ total }}</td>
+                </tr>
+            </table>
+        </div>
+        
+        <!-- Payment Info -->
+        <div class="payment-info">
+            <h3>Payment Information</h3>
+            <p><strong>Payment Terms:</strong> {{ payment_terms }}</p>
+            {% if payment_instructions %}
+            <p>{{ payment_instructions }}</p>
+            {% endif %}
+            {% if hst_number %}
+            <p class="hst-number"><strong>GST/HST #:</strong> {{ hst_number }}</p>
+            {% endif %}
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <p>Thank you for your business!</p>
+        </div>
+    </div>
+</body>
+</html>
