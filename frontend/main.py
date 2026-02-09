@@ -17,10 +17,10 @@ def main(page: ft.Page):
     page.title = "Tax Billing"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.padding = 0
-    page.window_width = 1200
-    page.window_height = 800
-    page.window_min_width = 800
-    page.window_min_height = 600
+    page.window.width = 1200
+    page.window.height = 800
+    page.window.min_width = 800
+    page.window.min_height = 600
     
     # Initialize API client
     api_url = os.getenv("API_URL", "http://localhost:8000")
@@ -99,4 +99,8 @@ def main(page: ft.Page):
 
 
 if __name__ == "__main__":
-    ft.app(target=main, port=8080, view=ft.AppView.WEB_BROWSER)
+    # Use FLET_WEB=1 for web browser mode (useful in WSL or headless environments)
+    if os.getenv("FLET_WEB", "0") == "1":
+        ft.app(target=main, port=8080, view=ft.AppView.WEB_BROWSER)
+    else:
+        ft.app(target=main)

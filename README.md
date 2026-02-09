@@ -28,9 +28,11 @@ A simple accounting and billing software for small businesses in Canada. The pri
 ### Prerequisites
 
 - Docker and Docker Compose installed
+- [mise](https://mise.jdx.dev/) (for Python version management)
 - Git
+- **Note:** This was developed & tested using WSL Ubuntu. `libmpv` and `gstreamer` required for Flet to open the app in a native window. Alternatively, use `mise run web` to run in browser mode.
 
-### 1. Clone and Start
+### 1. Clone and Setup
 
 ```bash
 # Clone the repository
@@ -40,17 +42,38 @@ cd tax-billing
 # Copy environment file
 cp .env.example .env
 
-# Start all services
-docker compose up -d
+# Install Python 3.12 via mise
+mise install
 ```
 
-### 2. Access the Application
+### 2. Run the Application
 
-- **Frontend**: http://localhost:8080
+```bash
+# Start backend services and launch the desktop app
+mise run frontend
+```
+
+This will:
+1. Start the PostgreSQL database and FastAPI backend in Docker containers
+2. Install frontend dependencies
+3. Launch the desktop application
+
+**Alternative: Run components separately**
+```bash
+# Start backend services only
+mise run up
+
+# In another terminal, run the frontend
+cd frontend && python main.py
+```
+
+### 3. Access Points
+
+- **Desktop App**: Launches automatically with `mise run frontend`
 - **Backend API**: http://localhost:8000
 - **API Documentation**: http://localhost:8000/docs
 
-### 3. Initial Setup
+### 4. Initial Setup
 
 1. Go to **Settings** in the frontend
 2. Configure your business information:
@@ -187,18 +210,23 @@ docker compose exec -T db psql -U postgres -d tax_billing < backup.sql
 
 ## Development
 
-### Running Locally Without Docker
+### Available Mise Tasks
 
 ```bash
-# Backend
+mise run up        # Start backend services (database + API)
+mise run stop      # Stop services (keeps containers)
+mise run down      # Stop and remove containers (keeps data)
+mise run frontend  # Start backend + launch desktop app (native Linux/macOS)
+mise run web       # Start backend + launch in web browser
+mise run logs      # View container logs
+```
+
+### Running Backend Locally (Without Docker)
+
+```bash
 cd backend
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
-
-# Frontend (separate terminal)
-cd frontend
-pip install -r requirements.txt
-flet run main.py --port 8080
 ```
 
 ### Viewing Logs

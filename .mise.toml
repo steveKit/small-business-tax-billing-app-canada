@@ -1,0 +1,28 @@
+[tools]
+python = "3.12"
+
+[tasks.up]
+run = "docker compose up -d db backend"
+description = "Start backend services (database and API)"
+
+[tasks.stop]
+run = "docker compose stop"
+description = "Stop all services (keeps containers)"
+
+[tasks.down]
+run = "docker compose down"
+description = "Stop and remove containers (keeps data)"
+
+[tasks.frontend]
+run = "cd frontend && pip install -q -r requirements.txt && python main.py"
+description = "Run the desktop frontend app"
+depends = ["up"]
+
+[tasks.web]
+run = "cd frontend && pip install -q -r requirements.txt && FLET_WEB=1 python main.py"
+description = "Run the frontend in web browser mode (for WSL)"
+depends = ["up"]
+
+[tasks.logs]
+run = "docker compose logs -f"
+description = "View logs from all containers"
