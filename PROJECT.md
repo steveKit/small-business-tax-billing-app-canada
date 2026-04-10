@@ -12,8 +12,12 @@ tax-holdback calculator + invoicing tool. It functions but is unhardened:
 no auth, no tests, no lint/type-check, hardcoded credentials in committed
 files, a broken auto-backup code path, and an unauthenticated SQL restore
 endpoint. A workflow plenary was held on 2026-04-10 and the project is
-now being hardened to L3 for eventual network exposure. First code work
-begins with Milestone 1 (Stop the Bleeding).
+now being hardened to L3 for eventual network exposure.
+
+**Milestone 0 (Workflow Scaffold) is complete** as of 2026-04-10 —
+tagged `milestone-00-workflow-scaffold`. No code was touched; only
+documentation, configuration, and ignore rules. The next session will
+pick up Milestone 1 (Stop the Bleeding) on user selection.
 
 ## Architecture Decisions
 
@@ -83,7 +87,7 @@ Ontario provincial brackets) in `database/seed_data.sql`.
 
 | Milestone | Target | Status | Notes |
 |-----------|--------|--------|-------|
-| 0 — Workflow Scaffold | 2026-04-10 | `in_progress` | This session |
+| 0 — Workflow Scaffold | 2026-04-10 | `complete` | Tag: `milestone-00-workflow-scaffold` |
 | 1 — Stop the Bleeding | — | `pending` | P0 fixes: broken auto-backup, hardcoded secrets, utcnow deprecations, localhost bind |
 | 2 — Quality Gates | — | `pending` | pyproject, ruff, mypy, pytest; TDD on tax_calculator; vertical slice |
 | 3 — Auth (L3) | — | `pending` | Single-user JWT auth, login, router decorator, harden restore endpoint |
