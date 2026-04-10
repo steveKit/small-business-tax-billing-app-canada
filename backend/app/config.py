@@ -20,11 +20,11 @@ class Settings(BaseSettings):
     debug: bool = False
     
     # Database
-    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/tax_billing"
+    database_url: str
     database_echo: bool = False
-    
+
     # JWT Authentication
-    jwt_secret_key: str = "your-secret-key-change-in-production"
+    jwt_secret_key: str
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 60 * 24  # 24 hours
     

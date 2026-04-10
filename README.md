@@ -39,8 +39,14 @@ A simple accounting and billing software for small businesses in Canada. The pri
 git clone <repository-url>
 cd tax-billing
 
-# Copy environment file
+# Copy environment file and fill in values
 cp .env.example .env
+# Then edit .env:
+#   - Set POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB
+#   - Set DATABASE_URL so it matches the values above
+#   - Generate a strong JWT_SECRET_KEY with:
+#       python -c "import secrets; print(secrets.token_urlsafe(32))"
+# The backend will refuse to start if DATABASE_URL or JWT_SECRET_KEY are missing.
 
 # Install Python 3.12 via mise
 mise install
@@ -263,12 +269,19 @@ docker compose up -d
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql+asyncpg://postgres:postgres@db:5432/tax_billing` |
-| `JWT_SECRET_KEY` | Secret key for JWT tokens | `change-this-secret-in-production` |
-| `DEBUG` | Enable debug mode | `false` |
-| `API_URL` | Backend URL for frontend | `http://backend:8000` |
+All variables are declared in `.env.example`. Copy it to `.env` and fill in
+real values — the backend refuses to start if `DATABASE_URL` or
+`JWT_SECRET_KEY` are missing.
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `POSTGRES_USER` | yes | Postgres container user (initialized on first boot) |
+| `POSTGRES_PASSWORD` | yes | Postgres container password — generate with `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
+| `POSTGRES_DB` | yes | Postgres database name |
+| `DATABASE_URL` | yes | Backend connection string; must match the `POSTGRES_*` values (e.g. `postgresql+asyncpg://<user>:<password>@db:5432/<db>`) |
+| `JWT_SECRET_KEY` | yes | Secret for JWT tokens — generate with `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
+| `DEBUG` | no | Enable debug mode (default `false`) |
+| `API_URL` | no | Backend URL for frontend (default `http://backend:8000`) |
 
 ## Invoice PDF Template
 
