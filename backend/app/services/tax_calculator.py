@@ -1,5 +1,5 @@
 """Tax calculation service."""
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
@@ -173,7 +173,7 @@ class TaxCalculatorService:
             total_tax_reserve=total_tax_reserve,
             paid_invoice_count=paid_row.count,
             pending_invoice_count=pending_row.count,
-            calculated_at=datetime.utcnow(),
+            calculated_at=datetime.now(timezone.utc),
         )
     
     async def get_tax_rates(self, year: int, province: str) -> TaxRatesResponse:
