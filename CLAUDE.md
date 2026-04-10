@@ -51,6 +51,12 @@ mise run up-all
 # Currently named `mise run frontend`; renames to `mise run desktop` in Milestone 5
 mise run desktop
 
+# Run Flet frontend in web mode (host-side, interim until Milestone 5)
+# Current way to get a browser UI: runs pip install + FLET_WEB=1 python main.py
+# on the HOST. Milestone 5 replaces this with the containerized frontend service
+# wired into `mise run up-all`.
+mise run web
+
 # Stop services (keeps containers and data)
 mise run stop
 
@@ -91,7 +97,7 @@ tax-billing/
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   └── app/
-│       ├── main.py              # FastAPI app factory, CORS, exception handler
+│       ├── main.py              # FastAPI app instance, CORS, exception handler
 │       ├── config.py            # pydantic-settings (reads .env)
 │       ├── database.py          # async SQLAlchemy engine + session factory
 │       ├── models/              # SQLAlchemy ORM models

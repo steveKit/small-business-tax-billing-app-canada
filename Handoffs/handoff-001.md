@@ -8,7 +8,7 @@ Plenary session for `tax-billing` project. Existing-project plenary — the code
 - `PROJECT.md` — status, 9 architecture decisions, data model, 8 milestones
 - `TASKS.md` — Milestones 0-1 fully decomposed; Milestones 2-7 sketched
 - `security-profile.yaml` — L3
-- `.claude/settings.json` — initial allow-list for mise/ruff/mypy/pytest/pip
+- `.claude/settings.json` — initial allow-list for read-only mise tasks (logs/lint/typecheck/test/smoke), ruff, mypy, pytest, pip read/install-from-manifest, docker compose read (ps/logs/config), and git read commands. State-changing commands (mise run up/down/stop/frontend/web, docker compose up/down, pip install `<pkg>`, git writes) stay director-gated.
 - `Handoffs/handoff-001.md` — this file
 - `.gitignore` extended with `.claude/worktrees/` and tighter secrets patterns
 

@@ -14,7 +14,8 @@ stack:
   # No auth library yet — passlib + python-jose are declared in
   # requirements.txt but unused. Milestone 3 (Auth) introduces JWT via
   # python-jose with Bearer tokens in the Authorization header. Until that
-  # lands, the API is bound to 127.0.0.1 only (Milestone 1 temp measure).
+  # lands, the API is currently exposed on all interfaces; TASK-004 in
+  # Milestone 1 binds it to 127.0.0.1 as a temporary mitigation.
   auth_library: python-jose
   orm_database: sqlalchemy-async/postgres-16
   api_style: rest

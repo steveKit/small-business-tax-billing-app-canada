@@ -53,7 +53,7 @@ discovered in the plenary audit.
 **Dependencies:** none
 **Description:** Every credential currently baked into `docker-compose.yml` and `backend/app/config.py` moves to `.env` refs. Violates `rules/security.md` § No Hardcoded Secrets. Not an auth task — just stop shipping credentials in committed files.
 **Files in scope:**
-- `docker-compose.yml` (lines 8, 9, 31, 32)
+- `docker-compose.yml` (lines 7, 8, 9, 31, 32)
 - `backend/app/config.py` (lines 23, 27)
 - `.env.example` (add any new required vars)
 - `.env` (user updates locally, not committed)
@@ -127,7 +127,7 @@ discovered in the plenary audit.
 - [ ] `docker compose down -v && docker compose up -d` rebuilds cleanly with new `.env`
 - [ ] Backend `/health` returns 200 from `127.0.0.1`
 - [ ] Frontend (host-mode `mise run desktop` for now) can load dashboard, create client, create invoice, record payment without crashing the auto-backup path
-- [ ] Grep for any remaining `postgres:postgres`, `change-this-secret`, `utcnow` — all zero
+- [ ] Grep for any remaining hardcoded secrets / deprecations — all zero matches (excluding `.env.example` and `.git/`): `grep -rn --exclude=.env.example --exclude-dir=.git -E "postgres:postgres|change-this-secret|your-secret-key|utcnow" .`
 - [ ] Milestone 1 tag created: `milestone-01-stop-the-bleeding`
 
 ---
