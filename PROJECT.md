@@ -15,9 +15,13 @@ endpoint. A workflow plenary was held on 2026-04-10 and the project is
 now being hardened to L3 for eventual network exposure.
 
 **Milestone 0 (Workflow Scaffold) is complete** as of 2026-04-10 —
-tagged `milestone-00-workflow-scaffold`. No code was touched; only
-documentation, configuration, and ignore rules. The next session will
-pick up Milestone 1 (Stop the Bleeding) on user selection.
+tagged `milestone-00-workflow-scaffold`. Session 003 (2026-04-10) landed
+the first four Milestone 1 tasks: TASK-001 (auto-backup fix), TASK-002
+(credentials extracted to .env), TASK-004 (127.0.0.1 bind), TASK-005
+(utcnow deprecations). Three Milestone 1 tasks remain — TASK-003 (strong
+secrets generation, user-gated data-loss event), TASK-006 (stale backup
+file cleanup, user-gated sudo), and TASK-007 (integration verification).
+Milestone 1 tag awaits TASK-007.
 
 ## Architecture Decisions
 
@@ -65,7 +69,7 @@ tax_years ──┬── federal_tax_brackets    (by year)
             ├── provincial_tax_brackets (by province+year)
             └── sales_tax_rates         (by province+year)
 
-backup_logs  (orphaned — see TASK-001)
+backup_logs  (wired — TASK-001 shipped 2026-04-10, PR #4)
 
 Views:
   v_tax_summary     (year → paid/pending revenue, taxes)
@@ -88,7 +92,7 @@ Ontario provincial brackets) in `database/seed_data.sql`.
 | Milestone | Target | Status | Notes |
 |-----------|--------|--------|-------|
 | 0 — Workflow Scaffold | 2026-04-10 | `complete` | Tag: `milestone-00-workflow-scaffold` |
-| 1 — Stop the Bleeding | — | `pending` | P0 fixes: broken auto-backup, hardcoded secrets, utcnow deprecations, localhost bind |
+| 1 — Stop the Bleeding | — | `in_progress` | 4/7 tasks shipped (PRs #4, #5); TASK-003/006/007 pending user-gated steps |
 | 2 — Quality Gates | — | `pending` | pyproject, ruff, mypy, pytest; TDD on tax_calculator; vertical slice |
 | 3 — Auth (L3) | — | `pending` | Single-user JWT auth, login, router decorator, harden restore endpoint |
 | 4 — Migrations | — | `pending` | Adopt Alembic, convert schema.sql, drop init-volume hack |

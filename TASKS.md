@@ -21,43 +21,6 @@ The P0 fixes that make the codebase safe to work on. Every task in this
 milestone addresses a latent bug, a security rule violation, or a footgun
 discovered in the plenary audit.
 
-### TASK-001: Fix broken auto-backup crash path [`pending`] [`P0`] [`S`]
-**Dependencies:** none
-**Description:** `BackupService(db)` is called with a `db` arg the constructor does not accept, and `await backup_service.create_backup(backup_type="auto")` does not match the current sync, arg-less method. First client or payment create crashes in production. Reconcile the caller signature with the service (plenary preference — don't delete the feature).
-**Files in scope:**
-- `backend/app/routers/clients.py` (3 call sites: lines 63, 112, 138)
-- `backend/app/routers/payments.py` (2 call sites: lines 125, 221)
-- `backend/app/services/backup_service.py`
-**Acceptance Criteria:**
-- [ ] `BackupService` constructor accepts the arguments its callers pass (or callers updated to match)
-- [ ] `create_backup` is async and accepts `backup_type: Literal["auto", "manual"]`
-- [ ] `backup_logs` table is actually written to (currently orphaned per plenary audit)
-- [ ] Regression test: creating a client triggers a successful auto-backup without exception
-- [ ] Manual QA: POST a client via `curl`, verify no 500
-**Notes:**
-- TDD-eligible. Tester first — interface spec is the reconciled BackupService signature.
-
----
-
-### TASK-002: Extract hardcoded credentials to .env [`pending`] [`P0`] [`M`]
-**Dependencies:** none
-**Description:** Every credential currently baked into `docker-compose.yml` and `backend/app/config.py` moves to `.env` refs. Violates `rules/security.md` § No Hardcoded Secrets. Not an auth task — just stop shipping credentials in committed files.
-**Files in scope:**
-- `docker-compose.yml` (lines 7, 8, 9, 31, 32)
-- `backend/app/config.py` (lines 23, 27)
-- `.env.example` (add any new required vars)
-- `.env` (user updates locally, not committed)
-**Acceptance Criteria:**
-- [ ] `docker-compose.yml` uses `${POSTGRES_USER}`, `${POSTGRES_PASSWORD}`, `${POSTGRES_DB}`, `${DATABASE_URL}` — no literal values
-- [ ] `backend/app/config.py` has no default values containing real-looking credentials
-- [ ] `.env.example` documents every new variable with a comment and a placeholder
-- [ ] README updated: "Copy `.env.example` to `.env` and generate real values" step is explicit
-- [ ] `docker compose up` still works with a fresh `.env` file
-**Notes:**
-- `JWT_SECRET_KEY` stays a placeholder until Milestone 3 — but generate one now anyway; cheap future-proofing.
-
----
-
 ### TASK-003: Generate strong secrets in .env [`pending`] [`P0`] [`S`]
 **Dependencies:** TASK-002
 **Description:** Populate the local `.env` with strong random values for `POSTGRES_PASSWORD` and `JWT_SECRET_KEY`. Document the generation command in `.env.example` comments. This is local-only work — director will not touch the user's `.env`; the user will follow a command the task provides.
@@ -67,33 +30,6 @@ discovered in the plenary audit.
 - [ ] `docker compose down -v && docker compose up -d` rebuilds the DB container with the new password
 **Notes:**
 - **Data loss event.** Because this wipes the `postgres_data` volume, user should export current data first if they've been using the tool. Director flags this in the task dispatch.
-
----
-
-### TASK-004: Bind backend to 127.0.0.1 (temporary) [`pending`] [`P0`] [`S`]
-**Dependencies:** none
-**Description:** Until auth lands in Milestone 3, the unauthenticated API must not be reachable from the host network. Update `docker-compose.yml` to bind the backend and frontend ports to `127.0.0.1` only. Temporary mitigation — removed in Milestone 7 when HTTPS + auth land.
-**Files in scope:**
-- `docker-compose.yml` (ports sections for `backend` and `frontend`)
-**Acceptance Criteria:**
-- [ ] `backend` port mapping is `127.0.0.1:8000:8000`
-- [ ] `frontend` port mapping is `127.0.0.1:8080:8080`
-- [ ] `db` port mapping is `127.0.0.1:5433:5432` (already local-only — verify)
-- [ ] Comment in compose file: `# Bound to 127.0.0.1 until auth lands (Milestone 3). See TASKS.md TASK-004.`
-- [ ] `curl http://127.0.0.1:8000/health` works; `curl http://<LAN-IP>:8000/health` does not
-
----
-
-### TASK-005: Fix datetime.utcnow() deprecations [`pending`] [`P1`] [`S`]
-**Dependencies:** none
-**Description:** Two remaining `datetime.utcnow()` calls survived the "deprecation fixes" commit. Replace with `datetime.now(timezone.utc)` per Python 3.12 guidance.
-**Files in scope:**
-- `backend/app/services/backup_service.py` (line 39)
-- `backend/app/services/tax_calculator.py` (line 176)
-**Acceptance Criteria:**
-- [ ] No `datetime.utcnow()` usage anywhere in `backend/`
-- [ ] `grep -rn "utcnow" backend/` returns no matches
-- [ ] Tax summary and backup log both still produce correct timestamps
 
 ---
 
@@ -284,8 +220,87 @@ _Tasks sketched; final decomposition at Milestone 7 plenary._
 
 ---
 
+### Milestone 1: Stop the Bleeding (partial — session 003)
+
+**Completed:** 2026-04-10
+**PRs:** #4 — `fix(backup): TASK-001 + TASK-005`; #5 — `chore(security): TASK-002 + TASK-004`
+**Remaining in milestone:** TASK-003, TASK-006, TASK-007 (next session)
+
+#### TASK-001: Fix broken auto-backup crash path [`complete`] [`P0`] [`S`]
+**Dependencies:** none
+**Description:** `BackupService(db)` was called with a `db` arg the constructor did not accept, and `await backup_service.create_backup(backup_type="auto")` did not match the sync, arg-less method. First client or payment create would crash. Reconciled the caller signature with the service.
+**Files in scope:**
+- `backend/app/routers/clients.py` (3 call sites: lines 63, 112, 138)
+- `backend/app/routers/payments.py` (2 call sites: lines 125, 221)
+- `backend/app/routers/backup.py` (manual backup endpoint — db dep added)
+- `backend/app/services/backup_service.py`
+**Acceptance Criteria:**
+- [x] `BackupService` constructor accepts `db: AsyncSession` — all 5 auto call sites and 2 manual call sites now consistent
+- [x] `create_backup` is async and accepts `backup_type: Literal["auto", "manual"]`
+- [x] `backup_logs` table is actually written to (was orphaned — ORM model existed but nothing wrote to it)
+- [ ] Regression test: creating a client triggers a successful auto-backup without exception — **deferred to Milestone 2** (no test infra yet; TASK-007 integration covers manual verification)
+- [ ] Manual QA: POST a client via `curl`, verify no 500 — **deferred to TASK-007**
+**Notes:**
+- Dispatched in standard mode (not TDD) because the fix was a refactor-to-match-callers, not behavior-spec-first.
+- Reviewer flagged 3 major issues on first pass: (1) mid-request `db.commit()` breaking transaction ownership, (2) sync `subprocess.run` blocking the event loop inside `async def`, (3) stripped `os.environ` on subprocess env. All three fixed in commit `1f24665` before merge. The transaction-boundary issue was director-caused (the dispatch spec explicitly said `flush() + commit()`; reviewer correctly pushed back). Lesson: `get_db` owns the request transaction — services that live under it should `add() + flush()`, never commit.
+- PR #4 squash-merged as `6f0b09b` on main.
+
+#### TASK-002: Extract hardcoded credentials to .env [`complete`] [`P0`] [`M`]
+**Dependencies:** none
+**Description:** Every credential baked into `docker-compose.yml` and `backend/app/config.py` moved to `.env` refs. Fixed an L3 `rules/security.md` § No Hardcoded Secrets violation that had been live since the project's inception.
+**Files in scope:**
+- `docker-compose.yml` (env refs, env_file wiring, healthcheck parameterization)
+- `backend/app/config.py` (removed defaults on `database_url` and `jwt_secret_key`)
+- `.env.example` (added `POSTGRES_USER/PASSWORD/DB`; documented the compose variable-expansion gotcha)
+- `README.md` (setup step + Environment Variables table tightened)
+**Acceptance Criteria:**
+- [x] `docker-compose.yml` uses `${POSTGRES_USER}`, `${POSTGRES_PASSWORD}`, `${POSTGRES_DB}`, `${DATABASE_URL}`, `${JWT_SECRET_KEY}` — no literal values, no dangerous `:-...` fallback on secrets
+- [x] `backend/app/config.py` has no default values containing real-looking credentials; pydantic-settings now fails fast at startup if `DATABASE_URL` or `JWT_SECRET_KEY` missing
+- [x] `.env.example` documents every new variable with a comment and a placeholder; includes prominent pointer to `python -c "import secrets; print(secrets.token_urlsafe(32))"`
+- [x] README updated: "Copy `.env.example` to `.env` and generate real values" step is explicit
+- [ ] `docker compose up` still works with a fresh `.env` file — **deferred to TASK-007**
+**Notes:**
+- Healthcheck updated to `pg_isready -U ${POSTGRES_USER}` so it tracks whatever user the operator configures.
+- `DEBUG` kept its `${DEBUG:-false}` fallback (not a secret, has matching default in `config.py`).
+- Line endings on `docker-compose.yml` and `.env.example` flipped CRLF→LF during the edit. Repo has mixed line endings (no `.gitattributes`); LF is correct for a Linux/Docker project. Flag for a `.gitattributes` task if the drift becomes noisy.
+- `config.py` has an unused `from typing import Optional` import — caught by reviewer, deferred to Milestone 2 ruff pass.
+- PR #5 squash-merged as `d30b558` on main.
+
+#### TASK-004: Bind backend to 127.0.0.1 (temporary) [`complete`] [`P0`] [`S`]
+**Dependencies:** none
+**Description:** Until auth lands in Milestone 3, the unauthenticated API must not be reachable from LAN. Bound all three services to 127.0.0.1. Temporary mitigation — removed in Milestone 7 when HTTPS + auth land.
+**Files in scope:**
+- `docker-compose.yml` (ports sections for `db`, `backend`, `frontend`)
+**Acceptance Criteria:**
+- [x] `backend` port mapping is `127.0.0.1:8000:8000`
+- [x] `frontend` port mapping is `127.0.0.1:8080:8080`
+- [x] `db` port mapping is `127.0.0.1:5433:5432`
+- [x] Comment in compose file: `# Bound to 127.0.0.1 until auth lands (Milestone 3). See TASKS.md TASK-004.`
+- [ ] `curl http://127.0.0.1:8000/health` works; `curl http://<LAN-IP>:8000/health` does not — **deferred to TASK-007**
+**Notes:**
+- Bundled into PR #5 with TASK-002 because both touched `docker-compose.yml`.
+
+#### TASK-005: Fix datetime.utcnow() deprecations [`complete`] [`P1`] [`S`]
+**Dependencies:** none
+**Description:** Two `datetime.utcnow()` calls replaced with `datetime.now(timezone.utc)` per Python 3.12 guidance.
+**Files in scope:**
+- `backend/app/services/backup_service.py` (replaced during the TASK-001 rewrite of `create_backup`)
+- `backend/app/services/tax_calculator.py` (line 176 — `get_tax_summary` timestamp)
+**Acceptance Criteria:**
+- [x] No `datetime.utcnow()` usage anywhere in `backend/`
+- [x] `grep -rn "utcnow" backend/` returns no matches
+- [x] Tax summary and backup log both still produce correct timestamps (same wall-clock semantics)
+**Notes:**
+- Bundled into PR #4 with TASK-001 because both touched `backup_service.py`.
+
+---
+
 ## Discovered Work
 
 _Tasks found during implementation that weren't in the original plan. User decides when/whether to promote these to Active Tasks._
 
-- None yet.
+- **`_get_db_params` fragile URL parsing** (session 003, PR #4 review) — `backend/app/services/backup_service.py::_get_db_params` splits `DATABASE_URL` by hand and crashes on passwords containing `:`, `@`, or `/`. Real passwords generated by `secrets.token_urlsafe(32)` are URL-safe, so this is latent, but TASK-003 introduces a new generated password so it could trip. Fix: use `urllib.parse.urlparse`. Proposed home: Milestone 6 (Dep Hygiene) or a new hardening task if TASK-003 surfaces a parse crash.
+- **Backup file disk-leak on partial failure** (session 003, PR #4 review) — if pg_dump succeeds and the dump file is written but the `BackupLog` insert/flush fails, the `.sql` file stays on disk with no log row pointing at it. Soft leak. Fix: wrap in try/except and `unlink()` the file on log-insert failure. Proposed home: Milestone 6 hardening.
+- **Line-ending drift / add `.gitattributes`** (session 003, PR #5) — repo has mixed CRLF/LF line endings. During TASK-002 edits, `docker-compose.yml` and `.env.example` flipped CRLF→LF, inflating diffs. Adding a `.gitattributes` with `* text=auto eol=lf` would normalize and prevent future churn. Small, cosmetic. Proposed home: Milestone 6 or a one-off chore before Milestone 2.
+- **Unused `from typing import Optional` in `backend/app/config.py`** (session 003, PR #5 review) — will be caught by ruff in Milestone 2 (TASK-008); no action needed now.
+- **Redundant `env_file: .env` on the `db` compose service** (session 003, PR #5 review, minor nit) — the `environment:` block already declares the `POSTGRES_*` vars via `${...}` substitution, so the `env_file:` line is redundant for its stated purpose. Also injects unrelated vars (JWT_SECRET_KEY, API_URL) into the postgres container environment, which is not a security hole but is slightly broader than necessary. Drop if revisiting compose in TASK-007 or later.
