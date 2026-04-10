@@ -53,6 +53,10 @@ pytest_debug.log
 
 # Environments
 .env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
 .venv
 env/
 venv/
@@ -103,3 +107,16 @@ frontend/dist/
 
 # Generated files
 *.pdf
+
+# Secrets (defensive — should never land here)
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+credentials.json
+secrets.*
+!secrets.example.*
+
+# Claude Code
+.claude/worktrees/
