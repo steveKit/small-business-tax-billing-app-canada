@@ -1,4 +1,6 @@
 """Database backup and restore service using pg_dump/psql."""
+import asyncio
+import os
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -48,7 +50,7 @@ class BackupService:
         filename = f"tax-billing-backup-{timestamp}.sql"
 
         # Run pg_dump
-        env = {"PGPASSWORD": params["password"]}
+        env = {**os.environ, "PGPASSWORD": params["password"]}
         cmd = [
             "pg_dump",
             "-h", params["host"],
@@ -61,7 +63,12 @@ class BackupService:
             "--if-exists",
         ]
 
-        result = subprocess.run(cmd, capture_output=True, env={**env})
+        result = await asyncio.to_thread(
+            subprocess.run,
+            cmd,
+            capture_output=True,
+            env=env,
+        )
 
         if result.returncode != 0:
             raise RuntimeError(f"pg_dump failed: {result.stderr.decode()}")
@@ -83,7 +90,6 @@ class BackupService:
         )
         self.db.add(log_entry)
         await self.db.flush()
-        await self.db.commit()
 
         return sql_bytes, filename
 
@@ -92,7 +98,7 @@ class BackupService:
         params = self._get_db_params()
 
         # Run psql to restore
-        env = {"PGPASSWORD": params["password"]}
+        env = {**os.environ, "PGPASSWORD": params["password"]}
         cmd = [
             "psql",
             "-h", params["host"],
@@ -102,7 +108,13 @@ class BackupService:
             "-q",  # Quiet mode
         ]
 
-        result = subprocess.run(cmd, input=sql_content, capture_output=True, env={**env})
+        result = await asyncio.to_thread(
+            subprocess.run,
+            cmd,
+            input=sql_content,
+            capture_output=True,
+            env=env,
+        )
 
         if result.returncode != 0:
             error_msg = result.stderr.decode()
