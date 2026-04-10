@@ -1,0 +1,49 @@
+# Security Profile — tax-billing
+#
+# L3 (Critical). This tool holds authoritative tax-holdback calculations and
+# real client PII (contact + address + HST number) for a Canadian sole-prop.
+# Data loss, tampering, or unauthorized disclosure all have real financial
+# and legal consequences for the owner. Hardening is an active milestone,
+# not an aspiration — see [[TASKS]] Milestones 1-7.
+
+level: L3
+
+stack:
+  language: python
+  framework: fastapi
+  # No auth library yet — passlib + python-jose are declared in
+  # requirements.txt but unused. Milestone 3 (Auth) introduces JWT via
+  # python-jose with Bearer tokens in the Authorization header. Until that
+  # lands, the API is currently exposed on all interfaces; TASK-004 in
+  # Milestone 1 binds it to 127.0.0.1 as a temporary mitigation.
+  auth_library: python-jose
+  orm_database: sqlalchemy-async/postgres-16
+  api_style: rest
+  deployment_target: docker-compose-localhost
+
+scope:
+  has_auth: false            # Flips to true when Milestone 3 lands
+  has_database: true
+  has_api: true
+  has_file_uploads: true     # POST /v1/backup/restore accepts .sql uploads
+  has_payment: false         # Records payments, does not process them
+  has_pii: true              # Client name/email/phone/address; HST number
+  has_external_services: false
+
+overrides:
+  # L3 enables these by default; listed here for explicitness.
+  rate_limiting: true
+  deserialization_safety: true
+  cors_headers: true
+  xss_prevention: true
+
+excluded_paths:
+  - ".claude/worktrees/**"
+  - "backups/**"             # Bind-mounted runtime artifacts, not source
+  - "frontend/.flet/**"
+  - "frontend/build/**"
+  - "frontend/dist/**"
+
+existing_security_tooling: []
+  # None yet. Milestone 2 introduces ruff + mypy. Future milestones may add
+  # bandit or semgrep — evaluate then, not now.
