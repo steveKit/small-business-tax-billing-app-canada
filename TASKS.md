@@ -46,63 +46,73 @@ discovered in the plenary audit.
 
 ---
 
-### TASK-015: Per-client invoice numbering `{year}-{client_slug}-{seq}` [`pending`] [`P1`] [`M`]
-**Dependencies:** none (but MUST be preceded by a fresh `pg_dump` backup because it mutates existing rows)
-**Description:** Change invoice-number format from the current global-per-year format (`INV-2026-0001`) to per-client-per-year (`{year}-{client_slug}-{seq:03d}`). Migrate the 3 existing invoices in the live db to the new format as part of the same change.
+### TASK-016: Fix PaymentMethod enum serialization (P0 hotfix) [`pending`] [`P0`] [`S`]
+**Dependencies:** none (P0 blocker)
+**Description:** Latent bug discovered session 004 the first time a payment was attempted. SQLAlchemy serializes `PaymentMethod.E_TRANSFER` as the member NAME (`'E_TRANSFER'`) instead of the member VALUE (`'e_transfer'`) because the `Enum(...)` column on `Payment.payment_method` is missing `values_callable`. Postgres rejects the uppercase name because the `payment_method` enum only contains lowercase values. Result: **every payment creation returns 500** with `asyncpg.exceptions.InvalidTextRepresentationError: invalid input value for enum payment_method: "E_TRANSFER"`.
 
-**Format rules:**
-- `{year}` — `invoices.year_billed` (already exists as a generated column)
-- `{client_slug}` — the first whitespace-delimited word of `clients.name`, stripped to `[A-Za-z0-9]` only, preserving case. Examples: `"Adamson Systems Engineering"` → `Adamson`; `"BEE"` → `BEE`; `"O'Reilly & Sons"` → `OReilly`.
-- `{seq:03d}` — per-client-per-year sequence, 3-digit zero-padded, starts at `001`, resets each year
-- Example outputs: `2026-Adamson-001`, `2026-Adamson-002`, `2026-BEE-001`, `2027-Adamson-001`
+**Why latent until now:** Payment count has been 0 for the entire project's life — no payment ever successfully inserted. The buggy "Mark as Paid" button (removed in TASK-013) bypassed payment creation entirely by PATCHing status directly. Now that TASK-013 forces payment-driven transitions, the bug surfaces on the very first real payment attempt.
+
+**Fix:** Add `values_callable=lambda obj: [e.value for e in obj]` to the `Enum(...)` column on `Payment.payment_method`, mirroring the pattern already correctly used on `Invoice.status` (`backend/app/models/invoice.py` lines 50–59).
 
 **Files in scope:**
-- `backend/app/routers/invoices.py` — rewrite `generate_invoice_number` to query `WHERE year_billed = year AND client_id = client_id`; new signature `generate_invoice_number(db, year, client_id) -> str`; add a module-level `_slug_client_name(name: str) -> str` helper with docstring + a handful of inline examples
-- `backend/app/services/invoice_pdf.py:95` — no code change expected (filename format `Invoice-{invoice_number}.pdf` still works), but verify
-- `backend/app/templates/invoice.html` — no change expected (template just renders `{{ invoice_number }}`), but verify
-- `frontend/views/invoices.py` and any detail view — verify no hardcoded `INV-` prefix or regex assumption; likely zero frontend code changes but must grep to confirm
-- One-off migration SQL committed under `database/migrations/` or embedded in the task notes as a `psql` script — user runs against live db
-
-**Data migration (one-off, wrapped in a transaction):**
-```sql
-BEGIN;
-UPDATE invoices SET invoice_number = '2026-Adamson-001'
-  WHERE id = '12d0c02b-24d2-4129-9fec-822bcbad3e34';
-UPDATE invoices SET invoice_number = '2026-Adamson-002'
-  WHERE id = '8b3deea9-2b84-4910-b1c0-1f73c30eabbf';
-UPDATE invoices SET invoice_number = '2026-BEE-001'
-  WHERE id = '086d67f3-c741-4d76-8ed9-34193cfde7c2';
--- Verify before commit:
--- SELECT id, invoice_number FROM invoices ORDER BY created_at;
-COMMIT;
-```
+- `backend/app/models/payment.py` — one-line addition on the `Enum(...)` call at lines 40–44
+- Grep audit across `backend/app/models/` for any other `Enum(X, name=..., create_type=False)` columns missing `values_callable`. If found, flag but do not fix in this task unless the fix is an identical one-liner.
 
 **Acceptance Criteria:**
-- [ ] `_slug_client_name` helper exists with docstring documenting the "first whitespace-delimited word, alphanumeric only, preserving case" rule
-- [ ] `generate_invoice_number` signature and query changed to scope by both `year_billed` and `client_id`; returns `{year}-{slug}-{seq:03d}` format
-- [ ] Existing 3 invoices migrated via the transactional SQL above (run against live db)
-- [ ] Post-migration API response (`GET /v1/invoices`) shows new `invoice_number` values for all 3 rows
-- [ ] Generated PDFs for migrated invoices reflect new numbers in both filename (`Invoice-2026-Adamson-001.pdf`) and rendered body
-- [ ] Manual QA: create a new Adamson invoice via Flet, verify number is `2026-Adamson-003`
-- [ ] Manual QA: create a new BEE invoice via Flet, verify number is `2026-BEE-002`
-- [ ] Grep `grep -rn "INV-" frontend/ backend/` finds zero matches outside of comments or historical-reference strings
-- [ ] Regression test deferred to Milestone 2 (no pytest infra yet — same pattern as TASK-001, TASK-013)
+- [ ] `backend/app/models/payment.py` `Payment.payment_method` column has `values_callable=lambda obj: [e.value for e in obj]`, matching the `Invoice.status` pattern exactly
+- [ ] `POST /v1/payments` with `"payment_method": "e_transfer"` returns 201 (verified live via curl against the running backend)
+- [ ] At least one other payment method value (e.g. `bank_transfer` or `cash`) also tested successfully
+- [ ] After a successful payment that satisfies an invoice's total, the invoice's status auto-transitions to `paid` via the existing `routers/payments.py` lines 117–120 logic — verified by inspecting the invoice response after payment create
+- [ ] Grep audit of `backend/app/models/` completed; any other ORM Enum columns missing `values_callable` are documented in the task notes (and fixed if trivial)
+- [ ] Regression test deferred to Milestone 2 with a note (same deferral pattern as TASK-001, TASK-013, TASK-015)
 
 **Notes:**
-- **Discovered 2026-04-13** (session 004) after the user pulled the 3 existing PDFs and decided the global-per-year scheme was harder to reference than a per-client sequence.
-- **Slug rule (a) chosen** over (c) an explicit `clients.short_name` column. Rationale: zero schema change means no volume wipe, no DDL drift, no Alembic pre-work. If client names ever collide under rule (a) (e.g., two clients both starting with "Adam..."), revisit with an explicit `short_name` field once Alembic lands in Milestone 4.
-- **Inherited race condition** in `generate_invoice_number`: count-then-insert with no row-level lock. Two concurrent creates for the same client+year could race to the same sequence number. The `UNIQUE` constraint on `invoice_number` would at least surface the collision as a 500 instead of silent overwrite. Not fixed here — personal single-user tool, acceptable risk. Flag for a Milestone 6 hardening task.
-- **Mapping confirmation** (from `created_at` order on 2026-04-13):
-  - `INV-2026-0001` (Adamson, 2026-02-09 19:02 UTC) → `2026-Adamson-001`
-  - `INV-2026-0002` (Adamson, 2026-02-09 20:09 UTC) → `2026-Adamson-002`
-  - `INV-2026-0003` (BEE, 2026-04-13 14:36 UTC) → `2026-BEE-001` (matches user's "invoice 1 for BEE" request)
-- **Sequencing within Milestone 1:** dispatch this *after* TASK-013 (so the invoice state is consistent before renaming) and *before* TASK-003 (so the pre-wipe backup captures the renamed rows, and the post-wipe restore comes back with the new numbers). Recommended order: TASK-013 → TASK-015 → fresh pg_dump → TASK-003 → TASK-006 → TASK-007.
-- **Dispatch mode:** standard (test-after). Small code change plus a 3-row data migration; no test infra yet.
+- **Discovered 2026-04-13** (session 004) when the user tried to record the real Adamson payments to close TASK-013's reconciliation loop. The 500 error surfaced a bug that had been sitting latently since project inception.
+- **Blocks real use of the tool.** No payment can be recorded until this lands. Blocks: TASK-013 reconciliation follow-through (real Adamson payments); TASK-007 integration verification (smoke test hits payment creation); any future production use.
+- **Dispatch mode:** standard (test-after). One-line fix mirroring an existing pattern in the same codebase; no design decisions.
+- **Sequencing:** dispatch IMMEDIATELY. After this merges, the user records the real Adamson payments via the normal UI flow — the existing `routers/payments.py` logic auto-transitions the invoices back to `paid`, closing the TASK-013 reconciliation loop.
+
+---
+
+### TASK-014: Replace `launch_url` with `FilePicker.save_file` for PDF download [`pending`] [`P1`] [`M`]
+**Dependencies:** none
+**Description:** The "Download PDF" button in `frontend/views/invoices.py` lines 188–191 calls `page.launch_url(pdf_url)`, which hands the URL to the OS for a browser to open. On WSLg this routes through GTK's `gtk_show_uri` → Wayland portal → `xdg_foreign`, a protocol WSLg's Weston-based compositor does not implement. Symptoms: `Gdk-WARNING: Server is missing xdg_foreign support` on every click, and the PDF either opens flakily via Windows interop or not at all — user cannot reliably download invoices from the Flet frontend.
+
+The backend endpoint `GET /v1/invoices/{id}/pdf` is correct (sends bytes with `Content-Disposition: attachment`). The bug is entirely on the Flet frontend side: the button label says "Download" but the code just hands a URL to the OS and hopes.
+
+**Proposed fix (Option 1 — FilePicker save):** Replace `launch_url` with a proper Flet-native file save flow using `ft.FilePicker.save_file`, mirroring the pattern already used for backup download in `frontend/views/settings.py:49`. The flow:
+1. Click "Download PDF" → call `self.api.get_invoice_pdf(invoice_id)` (already exists at `frontend/services/api_client.py:73`, returns `bytes`) to fetch PDF bytes
+2. Open `ft.FilePicker.save_file` dialog with a default filename (`Invoice-<number>.pdf`, where `<number>` is the new `2026-Adamson-001` style)
+3. On dialog confirm, write the bytes to the user-chosen path
+4. Toast `Saved to <path>` with a button to open the containing folder
+
+This is platform-agnostic (WSLg / native Linux / containerized web mode), eliminates all xdg-open / portal / xdg_foreign issues, and makes "Download" match the button label.
+
+**Files in scope:**
+- `frontend/views/invoices.py` — replace `download_pdf` helper (lines 188–191) and wire up a `FilePicker` instance on the view
+- `frontend/views/settings.py:227` — the backup-download uses the same `launch_url(backup_url)` anti-pattern and has the same xdg_foreign issue lurking. Include the same FilePicker fix here — same file tree, same pattern, same one-shot dispatch. Or flag as explicit follow-up if scope creep feels real.
+- `frontend/services/api_client.py` — verify `get_invoice_pdf(invoice_id) -> bytes` behaves correctly with the full chunked response body (should be fine; it uses `httpx.get().content`)
+
+**Acceptance Criteria:**
+- [ ] The "Download PDF" button no longer calls `launch_url`
+- [ ] Clicking the button opens an `ft.FilePicker.save_file` dialog with a default filename derived from the invoice number (e.g. `Invoice-2026-Adamson-001.pdf`)
+- [ ] Saving to the chosen path writes valid PDF bytes (verify with `file <path>` showing `PDF document`)
+- [ ] No `Gdk-WARNING` or `xdg_foreign` messages emitted on click
+- [ ] Works in both containerized web mode and native desktop mode
+- [ ] Settings view's backup-download button either fixed the same way, or logged as an explicit follow-up task if scope-creep concerns win out
+- [ ] Manual QA: download at least one real invoice (`2026-Adamson-001` or similar); verify the file opens in the host's PDF viewer
+- [ ] Regression test deferred to Milestone 2
+
+**Notes:**
+- **Discovered 2026-04-13** (session 004) when user first tried to download PDFs from the Flet frontend and hit the xdg_foreign warning. Workaround used during the session: curl directly against `http://127.0.0.1:8000/v1/invoices/{id}/pdf` from the host — works fine, files saved at `/home/horse/tax-billing-invoices/`.
+- **Not blocking TASK-007 integration verification.** User can pull invoices via curl. TASK-014 is P1 "fix the UX" not P0 "restore a broken flow".
+- **Alternative considered and rejected:** `apt install wslu` + `export BROWSER=wslview` as a host-side workaround. Rejected because it only helps WSLg users, the fix doesn't live in version control, and every new Windows dev environment would need the same incantation. The FilePicker approach is code-level, portable, and documented in source.
+- **Dispatch mode:** standard (test-after). UI change + API bytes fetching; minimal pure logic.
 
 ---
 
 ### TASK-007: Integration — Milestone 1 verification [`pending`] [`P0`] [`S`]
-**Dependencies:** TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-013, TASK-015
+**Dependencies:** TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-013, TASK-015, TASK-016
 **Description:** End-to-end verification that Milestone 1 left the tool in a working state. Wiring audit per plenary checklist; ensures no orphaned new modules.
 **Acceptance Criteria:**
 - [ ] `docker compose down -v && docker compose up -d` rebuilds cleanly with new `.env`
@@ -110,6 +120,7 @@ COMMIT;
 - [ ] Frontend (host-mode `mise run desktop` for now) can load dashboard, create client, create invoice, record payment without crashing the auto-backup path
 - [ ] Invoice status flow smoke-tested: direct PATCH to `PAID` rejected; payment-driven transition to `PAID` still works (TASK-013 regression check)
 - [ ] Invoice numbering smoke-tested: new invoice for Adamson lands as `2026-Adamson-NNN`; new invoice for BEE lands as `2026-BEE-NNN`; existing 3 rows migrated (TASK-015 regression check)
+- [ ] Payment creation smoke-tested: `POST /v1/payments` with a live `payment_method` value returns 201 (TASK-016 regression check)
 - [ ] Grep for any remaining hardcoded secrets / deprecations — all zero matches (excluding `.env.example` and `.git/`): `grep -rn --exclude=.env.example --exclude-dir=.git -E "postgres:postgres|change-this-secret|your-secret-key|utcnow" .`
 - [ ] Milestone 1 tag created: `milestone-01-stop-the-bleeding`
 
@@ -355,8 +366,8 @@ _Tasks sketched; final decomposition at Milestone 7 plenary._
 ### Milestone 1: Stop the Bleeding (partial — session 004)
 
 **Completed:** 2026-04-13
-**PRs:** #10 — `feat(invoices): TASK-013 — payments as source of truth for invoice status`
-**Remaining in milestone:** TASK-003, TASK-006, TASK-015, TASK-007 (next session)
+**PRs:** #10 — `feat(invoices): TASK-013 — payments as source of truth for invoice status`; #12 — `feat(invoices): TASK-015 — per-client invoice numbering`
+**Remaining in milestone:** TASK-003, TASK-006, TASK-016, TASK-014, TASK-007 (session 005+; TASK-016 discovered as a P0 hotfix while attempting the TASK-013 reconciliation follow-through; TASK-014 discovered as a P1 PDF-download UX issue)
 
 #### TASK-013: Make payments the source of truth for invoice status [`complete`] [`P1`] [`M`]
 **Dependencies:** none
@@ -390,6 +401,41 @@ _Tasks sketched; final decomposition at Milestone 7 plenary._
 - **Stale CLAUDE.md gotcha discovered** — TASK-013's implementer noticed the "Auto-backup code path is currently broken" bullet in CLAUDE.md § Gotchas is stale; TASK-001 fixed the code path but the doc was never updated. Logged in Discovered Work below for a separate docs PR.
 - **PR #10** squash-merged as `5a44a4e` on main.
 
+#### TASK-015: Per-client invoice numbering `{year}-{client_slug}-{seq}` [`complete`] [`P1`] [`M`]
+**Dependencies:** none (preceded by a fresh `pg_dump` backup per spec)
+**Description:** Switched invoice-number format from global-per-year (`INV-2026-0001`) to per-client-per-year (`{year}-{client_slug}-{seq:03d}`), and migrated the 3 existing rows in the live db to the new format in the same flow.
+
+**Chosen approach:** Slug rule (a) — first whitespace-delimited word of `clients.name`, ASCII alphanumeric only, case preserved (e.g. `"Adamson Systems Engineering"` → `"Adamson"`, `"BEE"` → `"BEE"`). Rule (c) (explicit `clients.short_name` column) was rejected to avoid pre-Alembic DDL work.
+
+**Files in scope (changed):**
+- `backend/app/routers/invoices.py` — one file. Three edits: (1) added `_slug_client_name` helper with docstring, examples, and ASCII-alphanumeric filter; (2) rewrote `generate_invoice_number` signature to `(db, year, client_id, client_name)`, scoped count query on both `year_billed` and `client_id`, changed format string to `f"{year}-{slug}-{count + 1:03d}"`, added docstring documenting the race condition; (3) updated the call site in `create_invoice` to pass `client.id` and `client.name` from the already-loaded client local.
+
+**Acceptance Criteria:**
+- [x] `_slug_client_name` helper present with docstring, examples, and error handling (ValueError on empty/non-alphanumeric-only inputs)
+- [x] `generate_invoice_number` rewritten with per-client-per-year scoping and new format string
+- [x] Existing 3 invoices migrated via transactional SQL UPDATE against the live db:
+  - `INV-2026-0001` → `2026-Adamson-001`
+  - `INV-2026-0002` → `2026-Adamson-002`
+  - `INV-2026-0003` → `2026-BEE-001`
+- [x] Post-migration API response (`GET /v1/invoices`) shows new `invoice_number` values for all 3 rows — verified via curl
+- [x] Manual QA: new Adamson invoice lands as `2026-Adamson-003` — verified live via `curl POST /v1/invoices` (test invoice subsequently deleted by user)
+- [x] Manual QA: new BEE invoice lands as `2026-BEE-002` — verified live via `curl POST /v1/invoices` (test invoice subsequently deleted by user)
+- [x] `grep -rn "INV-" backend/app/routers/` returns zero matches in the rewritten generator
+- [ ] PDF filename format for migrated invoices — **not live-tested** (the PDF download button is broken on this session's WSLg config; see TASK-014). Static reasoning: the PDF filename format (`Invoice-{invoice_number}.pdf`) is unchanged and the reviewer traced its consumers (`services/invoice_pdf.py`, `templates/invoice.html`) and confirmed they treat `invoice_number` as opaque. Safe by construction.
+- [x] Regression test deferred to Milestone 2 (same pattern as TASK-001, TASK-013)
+
+**Notes:**
+- **Discovered 2026-04-13** (session 004) after the user pulled the 3 existing PDFs via curl and decided the global-per-year scheme was harder to reference than a per-client sequence. First word "Adamson" / "BEE" suffices for the current client roster.
+- **Reviewer findings (PR #12):**
+  - Finding #1 (minor — slug collision across clients, e.g. "Adamson Systems" vs "Adamson Foundation") — **intentionally not fixed**. UNIQUE constraint on `invoice_number` surfaces any collision as a 500 rather than silent overwrite, so the failure mode is loud. Logged in Discovered Work for M4+ revisit if it surfaces in real data.
+  - Finding #2 (minor — M2 test plan coverage) — added as a scope note here to carry into TASK-011 / TASK-012 decomposition.
+  - Finding #3 (minor — migration audit trail in PR body) — addressed by updating PR #12 body with the post-migration `SELECT` output mid-review.
+- **Race condition inherited** — `generate_invoice_number` uses count-then-insert with no row lock; the handler docstring explicitly names this and points at a Milestone 6 hardening task.
+- **Pre-dispatch backup** — `~/tax-billing-backup-20260413-115039.sql` (27 KB, complete) captured before the data migration; restorable via `cat <file> | docker exec -i tax-billing-db psql -U postgres -d tax_billing`.
+- **Test invoices cleanup** — the 2 verification test invoices (Adamson-003 and BEE-002 with $0.01 totals) were created live during the director's post-implementer verification, then deleted by the user via `docker exec psql` after the safety hook correctly blocked the director from running destructive SQL.
+- **PR #12** squash-merged as `bd38aed` on main.
+- **M2 test backlog note (from reviewer finding #2):** when pytest infra lands in TASK-010, the `_slug_client_name` helper wants unit-test coverage for: empty string, whitespace-only, punctuation-only first word, non-ASCII-only first word ("日本"), leading-whitespace input, case preservation, digit-containing slug ("BEE2 Corp"), and a full "O'Reilly & Sons" happy path. Add to TASK-011 or TASK-012 decomposition when M2 opens.
+
 ---
 
 ## Discovered Work
@@ -402,3 +448,5 @@ _Tasks found during implementation that weren't in the original plan. User decid
 - **Unused `from typing import Optional` in `backend/app/config.py`** (session 003, PR #5 review) — will be caught by ruff in Milestone 2 (TASK-008); no action needed now.
 - **Redundant `env_file: .env` on the `db` compose service** (session 003, PR #5 review, minor nit) — the `environment:` block already declares the `POSTGRES_*` vars via `${...}` substitution, so the `env_file:` line is redundant for its stated purpose. Also injects unrelated vars (JWT_SECRET_KEY, API_URL) into the postgres container environment, which is not a security hole but is slightly broader than necessary. Drop if revisiting compose in TASK-007 or later.
 - **Stale CLAUDE.md gotcha re: auto-backup crash path** (session 004, TASK-013 implementer observation) — CLAUDE.md § Gotchas still contains the "Auto-backup code path is currently broken" bullet, but TASK-001 fixed that code path in session 003 (PR #4). The gotcha is misleading for any future agent or human reading the file. One-line deletion from `CLAUDE.md`. Not urgent; just misleading. Proposed home: next docs/chore window, or bundle with another M1 task's PR.
+- **Slug collision across clients** (session 004, PR #12 reviewer finding #1) — `_slug_client_name` uses the first whitespace-delimited word of `clients.name`, which means two clients whose names start with the same word (e.g. "Adamson Systems" and "Adamson Foundation") would produce the same slug and collide on their first invoice of the year. The `UNIQUE` constraint on `invoice_number` surfaces the collision as a 500 error rather than silent overwrite, so the failure mode is loud but user-visible. Possible fixes: (a) add an explicit `clients.short_name` column (requires DDL — wait for Alembic in M4); (b) detect collision at client-create time and require disambiguation; (c) extend the slug helper to append a discriminator when a clash exists. Not urgent — current client roster has no collision. Revisit if a real client collision surfaces or alongside M4 Alembic adoption.
+- **M2 test coverage for `_slug_client_name`** (session 004, PR #12 reviewer finding #2) — when pytest infra lands in TASK-010, add unit tests for the slug helper covering: empty string, whitespace-only, punctuation-only first word, non-ASCII-only first word, leading-whitespace input, case preservation, digit-containing slug ("BEE2 Corp"), happy path ("O'Reilly & Sons"). Add to TASK-011 or TASK-012 decomposition at M2 open.

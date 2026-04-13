@@ -18,15 +18,19 @@ now being hardened to L3 for eventual network exposure.
 tagged `milestone-00-workflow-scaffold`. Session 003 (2026-04-10) landed
 the first four Milestone 1 tasks: TASK-001 (auto-backup fix), TASK-002
 (credentials extracted to .env), TASK-004 (127.0.0.1 bind), TASK-005
-(utcnow deprecations). Session 004 (2026-04-13) landed TASK-013 (invoice
-status bug — payments are source of truth; PR #10, `5a44a4e`). Four
-Milestone 1 tasks remain — TASK-003 (strong secrets generation,
-user-gated data-loss event), TASK-006 (stale backup file cleanup,
-user-gated sudo), TASK-015 (per-client invoice numbering
-`{year}-{client}-{seq}`; discovered session 004), and TASK-007
-(integration verification). Milestone 1 tag awaits TASK-007.
-Recommended dispatch order within the remaining M1 work: TASK-015 →
-fresh pg_dump → TASK-003 → TASK-006 → TASK-007.
+(utcnow deprecations). Session 004 (2026-04-13) landed TASK-013
+(invoice status bug — payments are source of truth; PR #10, `5a44a4e`)
+and TASK-015 (per-client invoice numbering; PR #12, `bd38aed`). Five
+Milestone 1 tasks remain — TASK-016 (P0 hotfix — PaymentMethod enum
+serialization; latent bug surfaced when user attempted the first real
+payment post-TASK-013), TASK-014 (P1 — PDF download via FilePicker;
+discovered session 004 via WSLg xdg_foreign warnings), TASK-003 (strong
+secrets generation, user-gated data-loss event), TASK-006 (stale backup
+file cleanup, user-gated sudo), and TASK-007 (integration verification).
+Milestone 1 tag awaits TASK-007. Recommended dispatch order within the
+remaining M1 work: **TASK-016** (unblocks real payment creation) →
+record real Adamson payments → TASK-014 → TASK-003 → TASK-006 →
+TASK-007.
 
 ## Architecture Decisions
 
@@ -97,7 +101,7 @@ Ontario provincial brackets) in `database/seed_data.sql`.
 | Milestone | Target | Status | Notes |
 |-----------|--------|--------|-------|
 | 0 — Workflow Scaffold | 2026-04-10 | `complete` | Tag: `milestone-00-workflow-scaffold` |
-| 1 — Stop the Bleeding | — | `in_progress` | 5/9 tasks shipped (PRs #4, #5, #10); TASK-003/006/015/007 pending; TASK-013 landed session 004, TASK-015 added session 004 |
+| 1 — Stop the Bleeding | — | `in_progress` | 6/11 tasks shipped (PRs #4, #5, #10, #12); TASK-016/014/003/006/007 pending; TASK-013 and TASK-015 landed session 004; TASK-014 and TASK-016 discovered session 004 |
 | 2 — Quality Gates | — | `pending` | pyproject, ruff, mypy, pytest; TDD on tax_calculator; vertical slice |
 | 3 — Auth (L3) | — | `pending` | Single-user JWT auth, login, router decorator, harden restore endpoint |
 | 4 — Migrations | — | `pending` | Adopt Alembic, convert schema.sql, drop init-volume hack |
