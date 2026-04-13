@@ -179,7 +179,7 @@ None at plenary time. If the project diverges from global standards in the futur
 ## Gotchas
 
 - **Schema is applied via compose init-volume, not migrations.** `database/schema.sql` is mounted at `/docker-entrypoint-initdb.d/` and runs exactly once on first volume creation. Any schema change requires `docker compose down -v` and wipes all data. Alembic migrations arrive in Milestone 4 — do not add ad-hoc DDL before then.
-- **Host port 5433 → container 5432.** Intentional, to avoid colliding with a host Postgres. Connect externally on 5433, but the backend inside the compose network still talks to `db:5432`.
+- **Host port 5434 → container 5432.** Intentional, to avoid colliding with host Postgres or other Postgres containers. Connect externally on 5434, but the backend inside the compose network still talks to `db:5432`. (Was 5433 originally; moved to 5434 on 2026-04-13 after a port conflict.)
 - **`backups/` is bind-mounted and root-owned.** The container writes backup files as root onto the host volume, so `horse` cannot delete them without `sudo`. There are stale `.json` files from a previous backup implementation that TASK-006 will clean up.
 - **Auto-backup code path is currently broken.** `BackupService(db)` is called with a `db` arg the constructor does not accept, and `create_backup(backup_type="auto")` does not match the current method signature. First client or payment create will crash. TASK-001 fixes this.
 - **Cargo-culted dependencies.** `alembic`, `python-jose`, `passlib`, `httpx` (backend), and `psycopg2-binary` are declared in `backend/requirements.txt` but not yet used. `passlib` and `python-jose` become real in Milestone 3 (auth). The rest get trimmed in Milestone 6 after auth lands, so we know which stay.
