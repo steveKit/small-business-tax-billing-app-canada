@@ -1,5 +1,6 @@
 """Invoices view with edit functionality."""
 from datetime import date, timedelta
+from pathlib import Path
 import flet as ft
 from services.api_client import APIClient
 
@@ -192,14 +193,21 @@ class InvoicesView:
             invoice = next((i for i in self.invoices if i.get("id") == invoice_id), None)
             default_name = f"Invoice-{invoice.get('invoice_number', 'unknown')}.pdf" if invoice else "invoice.pdf"
 
+            # Token guards against rapid re-click across different invoices: if a
+            # later save_file() supersedes this one, the stale callback skips.
+            my_token = object()
+            pdf_file_picker.data = my_token
+
             def on_save_result(e: ft.FilePickerResultEvent):
+                if pdf_file_picker.data is not my_token:
+                    return  # superseded by a later download click
                 if not e.path:
                     return  # user cancelled
                 try:
                     pdf_bytes = self.api.get_invoice_pdf(invoice_id)
                     with open(e.path, "wb") as f:
                         f.write(pdf_bytes)
-                    show_success(f"Saved {default_name} to {e.path}")
+                    show_success(f"Saved {Path(e.path).name} to {e.path}")
                 except Exception as ex:
                     show_error(f"Download failed: {str(ex)}")
 

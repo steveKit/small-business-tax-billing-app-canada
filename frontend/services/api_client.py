@@ -181,7 +181,10 @@ class APIClient:
 
         filename = "backup.sql"
         disposition = response.headers.get("content-disposition", "")
-        # Cheap parser: matches `filename="..."` with double quotes
+        # Cheap parser — matches `filename="..."` with double quotes.
+        # Coupling anchor: backend/app/routers/backup.py:21 emits exactly
+        # `attachment; filename="{filename}"`. If that format changes, the
+        # parser falls through to the `backup.sql` fallback above.
         if 'filename="' in disposition:
             start = disposition.index('filename="') + len('filename="')
             end = disposition.index('"', start)
