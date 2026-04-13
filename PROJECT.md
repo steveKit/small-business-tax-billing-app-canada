@@ -18,10 +18,11 @@ now being hardened to L3 for eventual network exposure.
 tagged `milestone-00-workflow-scaffold`. Session 003 (2026-04-10) landed
 the first four Milestone 1 tasks: TASK-001 (auto-backup fix), TASK-002
 (credentials extracted to .env), TASK-004 (127.0.0.1 bind), TASK-005
-(utcnow deprecations). Three Milestone 1 tasks remain — TASK-003 (strong
+(utcnow deprecations). Four Milestone 1 tasks remain — TASK-003 (strong
 secrets generation, user-gated data-loss event), TASK-006 (stale backup
-file cleanup, user-gated sudo), and TASK-007 (integration verification).
-Milestone 1 tag awaits TASK-007.
+file cleanup, user-gated sudo), TASK-013 (invoice status bug — payments
+are source of truth; discovered session 004), and TASK-007 (integration
+verification). Milestone 1 tag awaits TASK-007.
 
 ## Architecture Decisions
 
@@ -92,7 +93,7 @@ Ontario provincial brackets) in `database/seed_data.sql`.
 | Milestone | Target | Status | Notes |
 |-----------|--------|--------|-------|
 | 0 — Workflow Scaffold | 2026-04-10 | `complete` | Tag: `milestone-00-workflow-scaffold` |
-| 1 — Stop the Bleeding | — | `in_progress` | 4/7 tasks shipped (PRs #4, #5); TASK-003/006/007 pending user-gated steps |
+| 1 — Stop the Bleeding | — | `in_progress` | 4/8 tasks shipped (PRs #4, #5); TASK-003/006/013/007 pending; TASK-013 added session 004 |
 | 2 — Quality Gates | — | `pending` | pyproject, ruff, mypy, pytest; TDD on tax_calculator; vertical slice |
 | 3 — Auth (L3) | — | `pending` | Single-user JWT auth, login, router decorator, harden restore endpoint |
 | 4 — Migrations | — | `pending` | Adopt Alembic, convert schema.sql, drop init-volume hack |
