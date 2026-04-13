@@ -18,14 +18,15 @@ now being hardened to L3 for eventual network exposure.
 tagged `milestone-00-workflow-scaffold`. Session 003 (2026-04-10) landed
 the first four Milestone 1 tasks: TASK-001 (auto-backup fix), TASK-002
 (credentials extracted to .env), TASK-004 (127.0.0.1 bind), TASK-005
-(utcnow deprecations). Five Milestone 1 tasks remain — TASK-003 (strong
-secrets generation, user-gated data-loss event), TASK-006 (stale backup
-file cleanup, user-gated sudo), TASK-013 (invoice status bug — payments
-are source of truth; discovered session 004), TASK-015 (per-client
-invoice numbering `{year}-{client}-{seq}`; discovered session 004), and
-TASK-007 (integration verification). Milestone 1 tag awaits TASK-007.
-Recommended dispatch order within the remaining M1 work: TASK-013 →
-TASK-015 → fresh pg_dump → TASK-003 → TASK-006 → TASK-007.
+(utcnow deprecations). Session 004 (2026-04-13) landed TASK-013 (invoice
+status bug — payments are source of truth; PR #10, `5a44a4e`). Four
+Milestone 1 tasks remain — TASK-003 (strong secrets generation,
+user-gated data-loss event), TASK-006 (stale backup file cleanup,
+user-gated sudo), TASK-015 (per-client invoice numbering
+`{year}-{client}-{seq}`; discovered session 004), and TASK-007
+(integration verification). Milestone 1 tag awaits TASK-007.
+Recommended dispatch order within the remaining M1 work: TASK-015 →
+fresh pg_dump → TASK-003 → TASK-006 → TASK-007.
 
 ## Architecture Decisions
 
@@ -96,7 +97,7 @@ Ontario provincial brackets) in `database/seed_data.sql`.
 | Milestone | Target | Status | Notes |
 |-----------|--------|--------|-------|
 | 0 — Workflow Scaffold | 2026-04-10 | `complete` | Tag: `milestone-00-workflow-scaffold` |
-| 1 — Stop the Bleeding | — | `in_progress` | 4/9 tasks shipped (PRs #4, #5); TASK-003/006/013/015/007 pending; TASK-013 and TASK-015 added session 004 |
+| 1 — Stop the Bleeding | — | `in_progress` | 5/9 tasks shipped (PRs #4, #5, #10); TASK-003/006/015/007 pending; TASK-013 landed session 004, TASK-015 added session 004 |
 | 2 — Quality Gates | — | `pending` | pyproject, ruff, mypy, pytest; TDD on tax_calculator; vertical slice |
 | 3 — Auth (L3) | — | `pending` | Single-user JWT auth, login, router decorator, harden restore endpoint |
 | 4 — Migrations | — | `pending` | Adopt Alembic, convert schema.sql, drop init-volume hack |
