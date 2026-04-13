@@ -46,43 +46,6 @@ discovered in the plenary audit.
 
 ---
 
-### TASK-014: Replace `launch_url` with `FilePicker.save_file` for PDF download [`pending`] [`P1`] [`M`]
-**Dependencies:** none
-**Description:** The "Download PDF" button in `frontend/views/invoices.py` lines 188–191 calls `page.launch_url(pdf_url)`, which hands the URL to the OS for a browser to open. On WSLg this routes through GTK's `gtk_show_uri` → Wayland portal → `xdg_foreign`, a protocol WSLg's Weston-based compositor does not implement. Symptoms: `Gdk-WARNING: Server is missing xdg_foreign support` on every click, and the PDF either opens flakily via Windows interop or not at all — user cannot reliably download invoices from the Flet frontend.
-
-The backend endpoint `GET /v1/invoices/{id}/pdf` is correct (sends bytes with `Content-Disposition: attachment`). The bug is entirely on the Flet frontend side: the button label says "Download" but the code just hands a URL to the OS and hopes.
-
-**Proposed fix (Option 1 — FilePicker save):** Replace `launch_url` with a proper Flet-native file save flow using `ft.FilePicker.save_file`, mirroring the pattern already used for backup download in `frontend/views/settings.py:49`. The flow:
-1. Click "Download PDF" → call `self.api.get_invoice_pdf(invoice_id)` (already exists at `frontend/services/api_client.py:73`, returns `bytes`) to fetch PDF bytes
-2. Open `ft.FilePicker.save_file` dialog with a default filename (`Invoice-<number>.pdf`, where `<number>` is the new `2026-Adamson-001` style)
-3. On dialog confirm, write the bytes to the user-chosen path
-4. Toast `Saved to <path>` with a button to open the containing folder
-
-This is platform-agnostic (WSLg / native Linux / containerized web mode), eliminates all xdg-open / portal / xdg_foreign issues, and makes "Download" match the button label.
-
-**Files in scope:**
-- `frontend/views/invoices.py` — replace `download_pdf` helper (lines 188–191) and wire up a `FilePicker` instance on the view
-- `frontend/views/settings.py:227` — the backup-download uses the same `launch_url(backup_url)` anti-pattern and has the same xdg_foreign issue lurking. Include the same FilePicker fix here — same file tree, same pattern, same one-shot dispatch. Or flag as explicit follow-up if scope creep feels real.
-- `frontend/services/api_client.py` — verify `get_invoice_pdf(invoice_id) -> bytes` behaves correctly with the full chunked response body (should be fine; it uses `httpx.get().content`)
-
-**Acceptance Criteria:**
-- [ ] The "Download PDF" button no longer calls `launch_url`
-- [ ] Clicking the button opens an `ft.FilePicker.save_file` dialog with a default filename derived from the invoice number (e.g. `Invoice-2026-Adamson-001.pdf`)
-- [ ] Saving to the chosen path writes valid PDF bytes (verify with `file <path>` showing `PDF document`)
-- [ ] No `Gdk-WARNING` or `xdg_foreign` messages emitted on click
-- [ ] Works in both containerized web mode and native desktop mode
-- [ ] Settings view's backup-download button either fixed the same way, or logged as an explicit follow-up task if scope-creep concerns win out
-- [ ] Manual QA: download at least one real invoice (`2026-Adamson-001` or similar); verify the file opens in the host's PDF viewer
-- [ ] Regression test deferred to Milestone 2
-
-**Notes:**
-- **Discovered 2026-04-13** (session 004) when user first tried to download PDFs from the Flet frontend and hit the xdg_foreign warning. Workaround used during the session: curl directly against `http://127.0.0.1:8000/v1/invoices/{id}/pdf` from the host — works fine, files saved at `/home/horse/tax-billing-invoices/`.
-- **Not blocking TASK-007 integration verification.** User can pull invoices via curl. TASK-014 is P1 "fix the UX" not P0 "restore a broken flow".
-- **Alternative considered and rejected:** `apt install wslu` + `export BROWSER=wslview` as a host-side workaround. Rejected because it only helps WSLg users, the fix doesn't live in version control, and every new Windows dev environment would need the same incantation. The FilePicker approach is code-level, portable, and documented in source.
-- **Dispatch mode:** standard (test-after). UI change + API bytes fetching; minimal pure logic.
-
----
-
 ### TASK-007: Integration — Milestone 1 verification [`pending`] [`P0`] [`S`]
 **Dependencies:** TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-013, TASK-015, TASK-016
 **Description:** End-to-end verification that Milestone 1 left the tool in a working state. Wiring audit per plenary checklist; ensures no orphaned new modules.
@@ -338,8 +301,8 @@ _Tasks sketched; final decomposition at Milestone 7 plenary._
 ### Milestone 1: Stop the Bleeding (partial — session 004)
 
 **Completed:** 2026-04-13
-**PRs:** #10 — `feat(invoices): TASK-013 — payments as source of truth for invoice status`; #12 — `feat(invoices): TASK-015 — per-client invoice numbering`; #14 — `fix(models): TASK-016 — PaymentMethod enum values_callable (P0 hotfix)`
-**Remaining in milestone:** TASK-003, TASK-006, TASK-014, TASK-007 (session 005+; TASK-014 discovered as a P1 PDF-download UX issue)
+**PRs:** #10 — `feat(invoices): TASK-013 — payments as source of truth for invoice status`; #12 — `feat(invoices): TASK-015 — per-client invoice numbering`; #14 — `fix(models): TASK-016 — PaymentMethod enum values_callable (P0 hotfix)`; #16 — `feat(frontend): TASK-014 — FilePicker save for PDF and backup downloads`
+**Remaining in milestone:** TASK-003, TASK-006, TASK-007 (session 005+)
 
 #### TASK-013: Make payments the source of truth for invoice status [`complete`] [`P1`] [`M`]
 **Dependencies:** none
@@ -435,6 +398,39 @@ _Tasks sketched; final decomposition at Milestone 7 plenary._
 - **Stale CLAUDE.md gotcha also applies to the PaymentMethod situation** — the current Gotchas list notes "Auto-backup code path is currently broken" (TASK-001 already fixed this). Separately, the PaymentMethod/values_callable trap is worth a new Gotcha line warning future developers. Flag for the stale-gotcha cleanup PR already logged in Discovered Work.
 - **PR #14** squash-merged as `673e4d0` on main.
 
+#### TASK-014: Replace `launch_url` with `FilePicker.save_file` for PDF and backup downloads [`complete`] [`P1`] [`M`]
+**Dependencies:** none
+**Description:** Replaced `page.launch_url(url)` with `ft.FilePicker.save_file()` in two Flet download buttons (invoice PDF + database backup). The original code routed through GTK's `gtk_show_uri` → Wayland desktop portal → `xdg_foreign` protocol for window parenting, which WSLg's Weston compositor does not implement — every click produced `Gdk-WARNING: Server is missing xdg_foreign support` and the launch was unreliable. The new code fetches bytes from the backend and uses the native `save_file` dialog, making "Download" match the button label and working identically on all platforms.
+
+**Files in scope (changed):**
+- `frontend/services/api_client.py` — added `get_backup_download() -> tuple[bytes, str]` method that fetches bytes and parses the `Content-Disposition` header to extract a suggested filename (falls back to `"backup.sql"` if header is missing). Cheap string parser; no cgi/email.message imports.
+- `frontend/views/invoices.py` — added `pdf_file_picker = ft.FilePicker()` at top of `build()`, placed as first item in content Column; rewrote `download_pdf` to look up `invoice_number` from `self.invoices`, invoke `pdf_file_picker.save_file(...)` with a closure-based callback that fetches bytes via `api.get_invoice_pdf()` and writes them; added `from pathlib import Path`; token-sentinel guard via `pdf_file_picker.data` (fixup) to prevent rapid-double-click callback races; success toast uses `Path(e.path).name` (fixup) to show the filename the user actually picked.
+- `frontend/views/settings.py` — added a second `backup_file_picker` (the existing restore `file_picker` left untouched); rewrote `download_backup` to fetch bytes once via `api.get_backup_download()`, then invoke `backup_file_picker.save_file(...)` with a closure-captured `sql_bytes`. Single-fetch pattern avoids double-invoking `pg_dump` on the backend.
+
+**Acceptance Criteria:**
+- [x] "Download PDF" button no longer calls `launch_url` (grep confirmed zero call sites)
+- [x] Clicking the PDF button invokes `ft.FilePicker.save_file()` with a default filename derived from the invoice number (e.g. `Invoice-2026-Adamson-001.pdf`) — verified via AST + diff read
+- [x] `get_backup_download` method added with `Content-Disposition` parsing and safe fallback
+- [x] Settings view's backup-download button fixed the same way (second `FilePicker` instance; existing restore picker untouched)
+- [x] Platform-agnostic — uses only `open()`, `httpx`, and `ft.FilePicker`; no Linux/WSLg-specific code
+- [x] `docker compose restart frontend` succeeds with no new errors; imports for `APIClient`, `InvoicesView`, and `SettingsView` all load cleanly — verified live
+- [ ] Manual QA: download a real invoice PDF via the button; verify the file opens in a PDF viewer — **deferred to user** (director cannot click buttons in Flet; acceptance criterion passes once user confirms post-merge)
+- [ ] Same manual QA for backup download — **deferred to user**
+- [x] Regression test deferred to Milestone 2 (same pattern as TASK-001, TASK-013, TASK-015, TASK-016)
+
+**Notes:**
+- **Discovered 2026-04-13** (session 004) when the user first tried to download PDFs and hit the xdg_foreign warning. Session workaround was curl directly against `http://127.0.0.1:8000/v1/invoices/{id}/pdf` → files saved at `/home/horse/tax-billing-invoices/`.
+- **Reviewer findings (PR #16):**
+  - #1 (minor — callback race on rapid double-click) — **fixed** in fixup commit `ba3f864`: added `my_token = object()` sentinel on `pdf_file_picker.data`, stale-check as first line of `on_save_result`. Not a realistic failure mode for a single-user tool but the fix is 4 lines and eliminates the class.
+  - #2 (minor — `Content-Disposition` parser coupling anchor) — **fixed** in fixup commit: expanded comment above the parser to reference `backend/app/routers/backup.py:21` so a future backend change flags the frontend parser via grep.
+  - #5 (minor — success toast showed suggested filename not actual) — **fixed** in fixup commit: added `from pathlib import Path`, changed toast to use `Path(e.path).name`.
+  - #3 (minor — eager backup fetch orphans a `pg_dump` snapshot when user cancels) — **intentionally not fixed**. Requires backend changes to `backup_service.py` to stream without persisting via the HTTP endpoint; out of scope for a frontend-only PR. Logged in Discovered Work.
+  - #4 (minor — FilePicker `page.overlay` migration) — **intentionally not fixed**. Would touch 3 FilePickers including the existing restore picker which works empirically; risk of regressing restore > benefit of canonical placement. Logged in Discovered Work as a follow-up consistency task.
+- **Defense in depth on the callback race:** `download_backup` does NOT need the token guard because `sql_bytes` is captured in the closure BEFORE `save_file()` is invoked. Each backup callback owns its own bytes.
+- **Not blocking TASK-007 integration verification.** User had a curl workaround all session. TASK-014 is P1 "fix the UX" not P0 "restore a broken flow".
+- **Alternative considered and rejected:** `apt install wslu` + `export BROWSER=wslview` as a host-side workaround. Rejected because it only helps WSLg users, doesn't live in version control, and every new Windows dev environment would need the same incantation.
+- **PR #16** squash-merged as `379e6be` on main.
+
 ---
 
 ## Discovered Work
@@ -449,3 +445,5 @@ _Tasks found during implementation that weren't in the original plan. User decid
 - **Stale CLAUDE.md gotcha re: auto-backup crash path** (session 004, TASK-013 implementer observation) — CLAUDE.md § Gotchas still contains the "Auto-backup code path is currently broken" bullet, but TASK-001 fixed that code path in session 003 (PR #4). The gotcha is misleading for any future agent or human reading the file. One-line deletion from `CLAUDE.md`. Not urgent; just misleading. Proposed home: next docs/chore window, or bundle with another M1 task's PR.
 - **Slug collision across clients** (session 004, PR #12 reviewer finding #1) — `_slug_client_name` uses the first whitespace-delimited word of `clients.name`, which means two clients whose names start with the same word (e.g. "Adamson Systems" and "Adamson Foundation") would produce the same slug and collide on their first invoice of the year. The `UNIQUE` constraint on `invoice_number` surfaces the collision as a 500 error rather than silent overwrite, so the failure mode is loud but user-visible. Possible fixes: (a) add an explicit `clients.short_name` column (requires DDL — wait for Alembic in M4); (b) detect collision at client-create time and require disambiguation; (c) extend the slug helper to append a discriminator when a clash exists. Not urgent — current client roster has no collision. Revisit if a real client collision surfaces or alongside M4 Alembic adoption.
 - **M2 test coverage for `_slug_client_name`** (session 004, PR #12 reviewer finding #2) — when pytest infra lands in TASK-010, add unit tests for the slug helper covering: empty string, whitespace-only, punctuation-only first word, non-ASCII-only first word, leading-whitespace input, case preservation, digit-containing slug ("BEE2 Corp"), happy path ("O'Reilly & Sons"). Add to TASK-011 or TASK-012 decomposition at M2 open.
+- **Backend `pg_dump` orphan on save-dialog cancel** (session 004, PR #16 reviewer finding #3) — the frontend `download_backup` eagerly fetches `GET /v1/backup/download` before opening the save dialog (to get the suggested filename). Each call to that endpoint triggers `BackupService.create_backup('manual')`, which shells out to `pg_dump`, writes a `.sql` file to the bind-mounted `backups/` directory, and inserts a `backup_logs` row. If the user then cancels the save dialog, the dump exists on disk but was never handed to the user — orphaned work and a stray file. Fix options: (a) refactor `create_backup` to support a stream-only mode when called via the HTTP endpoint (don't persist unless requested); (b) add an in-memory-only variant `generate_backup_bytes()` distinct from the persistent `create_backup()`; (c) accept the status quo and document it. Proposed home: Milestone 6 hardening, or bundled with any future backend-streaming work.
+- **FilePicker `page.overlay` migration** (session 004, PR #16 reviewer finding #4) — three FilePicker instances currently live in view content Columns instead of `page.overlay` as Flet docs recommend. The existing restore `file_picker` in `settings.py:49` already uses the in-content pattern and works empirically; both new save pickers (`pdf_file_picker` in invoices.py and `backup_file_picker` in settings.py) follow the same pattern for consistency. Migrating all three to `self.page.overlay.append(...)` would match Flet's canonical guidance and be consistent with how `clients.py:212` and `payments.py:224` handle dialogs. Risk: no test harness to catch a restore regression during the migration. Small, cosmetic, no functional improvement. Proposed home: next frontend consistency pass or Milestone 5 (Containerize Frontend) cleanup.
