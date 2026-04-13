@@ -99,7 +99,6 @@ class InvoicesView:
                         ft.IconButton(icon=ft.icons.EDIT, icon_size=20, tooltip="Edit", on_click=lambda _, i=inv: open_edit_dialog(i)),
                         ft.IconButton(icon=ft.icons.PICTURE_AS_PDF, icon_size=20, tooltip="Download PDF", on_click=lambda _, iid=inv["id"]: download_pdf(iid)),
                         ft.IconButton(icon=ft.icons.SEND, icon_size=20, tooltip="Mark as Pending", on_click=lambda _, iid=inv["id"]: update_status(iid, "pending")) if inv.get("status") == "draft" else ft.Container(),
-                        ft.IconButton(icon=ft.icons.CHECK, icon_size=20, tooltip="Mark as Paid", on_click=lambda _, iid=inv["id"]: update_status(iid, "paid")) if inv.get("status") == "pending" else ft.Container(),
                     ], tight=True)),
                 ])
                 for inv in self.invoices

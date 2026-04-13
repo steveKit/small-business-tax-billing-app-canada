@@ -22,6 +22,19 @@ from app.services.invoice_pdf import InvoicePDFService
 router = APIRouter(prefix="/v1/invoices", tags=["Invoices"])
 
 
+# Legal invoice status transitions via PATCH /v1/invoices/{id}/status.
+# PAID is intentionally excluded — the only way into PAID is via payment
+# records that satisfy the invoice total (see routers/payments.py), and
+# the only way out is by deleting payments until the sum drops below total.
+# DRAFT is excluded as a target — invoices move forward through the state
+# machine, never backward.
+# CANCELLED is terminal — no transitions out.
+ALLOWED_STATUS_TRANSITIONS: dict[InvoiceStatus, set[InvoiceStatus]] = {
+    InvoiceStatus.DRAFT: {InvoiceStatus.PENDING, InvoiceStatus.CANCELLED},
+    InvoiceStatus.PENDING: {InvoiceStatus.CANCELLED},
+}
+
+
 async def generate_invoice_number(db: AsyncSession, year: int) -> str:
     result = await db.execute(select(func.count(Invoice.id)).where(Invoice.year_billed == year))
     count = result.scalar() or 0
@@ -134,11 +147,43 @@ async def update_invoice(invoice_id: UUID, invoice_data: InvoiceUpdate, db: Asyn
 
 @router.patch("/{invoice_id}/status", response_model=InvoiceResponse)
 async def update_invoice_status(invoice_id: UUID, status_update: InvoiceStatusUpdate, db: AsyncSession = Depends(get_db)):
+    """Update an invoice's status via a legal state-machine transition.
+
+    Error contract:
+    - 422: target is not in InvoiceStatusUpdate's Literal (rejected at
+      request parsing — callers sending 'paid' or 'draft' land here).
+    - 400 with PAID-specific detail: caller bypassed the schema and
+      sent PAID at the handler level. Defense-in-depth; not reachable
+      from a normal HTTP client but guards against programmatic misuse.
+    - 400 with generic detail: target is syntactically valid but not
+      reachable from the current status per ALLOWED_STATUS_TRANSITIONS
+      (e.g., PENDING→PENDING, or anything out of CANCELLED/PAID state).
+    - 404: invoice not found.
+
+    The 422/400 split is intentional defense-in-depth between the
+    pydantic schema and the handler whitelist. API clients should treat
+    both as "illegal transition". Unifying to a single error shape is
+    deferred to Milestone 2 when test infra lands.
+    """
     result = await db.execute(select(Invoice).options(selectinload(Invoice.client), selectinload(Invoice.payments)).where(Invoice.id == invoice_id))
     invoice = result.scalar_one_or_none()
     if not invoice:
         raise HTTPException(status_code=404, detail=f"Invoice with ID {invoice_id} not found")
-    invoice.status = status_update.status
+
+    target = status_update.status
+    allowed = ALLOWED_STATUS_TRANSITIONS.get(invoice.status, set())
+    if target not in allowed:
+        if target == InvoiceStatus.PAID:
+            raise HTTPException(
+                status_code=400,
+                detail="Invoice status cannot be set to PAID manually — record a payment instead.",
+            )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot transition invoice from {invoice.status.value} to {status_update.status.value}.",
+        )
+
+    invoice.status = target
     await db.flush()
     await db.refresh(invoice)
     return build_invoice_response(invoice)
