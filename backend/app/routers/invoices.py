@@ -35,10 +35,61 @@ ALLOWED_STATUS_TRANSITIONS: dict[InvoiceStatus, set[InvoiceStatus]] = {
 }
 
 
-async def generate_invoice_number(db: AsyncSession, year: int) -> str:
-    result = await db.execute(select(func.count(Invoice.id)).where(Invoice.year_billed == year))
+def _slug_client_name(name: str) -> str:
+    """Derive an invoice-number slug from a client's name.
+
+    Rule: take the first whitespace-delimited word, strip characters that
+    are not ASCII alphanumeric, preserve case. Returns a non-empty string
+    or raises ValueError if the input cannot yield a valid slug.
+
+    Examples:
+        "Adamson Systems Engineering" -> "Adamson"
+        "BEE"                         -> "BEE"
+        "O'Reilly & Sons"             -> "OReilly"
+        "   Leading spaces Inc"       -> "Leading"
+
+    Raises:
+        ValueError: if the first word contains no alphanumeric characters
+        (or the name is empty / whitespace-only).
+    """
+    words = name.split()
+    if not words:
+        raise ValueError(f"Cannot derive invoice-number slug from empty client name: {name!r}")
+    first = words[0]
+    slug = "".join(c for c in first if c.isalnum() and c.isascii())
+    if not slug:
+        raise ValueError(f"Cannot derive invoice-number slug from client name: {name!r}")
+    return slug
+
+
+async def generate_invoice_number(
+    db: AsyncSession,
+    year: int,
+    client_id: UUID,
+    client_name: str,
+) -> str:
+    """Produce the next invoice number for a client in a given year.
+
+    Format: ``{year}-{slug}-{seq:03d}``. Slug comes from
+    ``_slug_client_name(client_name)``; sequence is ``count(invoices
+    where year_billed = year and client_id = client_id) + 1``, 3-digit
+    zero-padded.
+
+    Known limitation: the count-then-insert pattern has a race condition
+    under concurrent invoice creates for the same client+year. The
+    ``invoice_number`` UNIQUE constraint at the DB level surfaces any
+    collision as an error rather than a silent overwrite. This is
+    acceptable for a single-user tool; see Milestone 6 hardening notes.
+    """
+    slug = _slug_client_name(client_name)
+    result = await db.execute(
+        select(func.count(Invoice.id)).where(
+            Invoice.year_billed == year,
+            Invoice.client_id == client_id,
+        )
+    )
     count = result.scalar() or 0
-    return f"INV-{year}-{count + 1:04d}"
+    return f"{year}-{slug}-{count + 1:03d}"
 
 
 def build_invoice_response(invoice: Invoice) -> InvoiceResponse:
@@ -88,7 +139,7 @@ async def create_invoice(invoice_data: InvoiceCreate, db: AsyncSession = Depends
     if not sales_tax:
         raise HTTPException(status_code=400, detail=f"Sales tax rate not found for {settings.province} in {year}")
     
-    invoice_number = await generate_invoice_number(db, year)
+    invoice_number = await generate_invoice_number(db, year, client.id, client.name)
     tax_rate = sales_tax.total_rate
     tax_amount = (invoice_data.subtotal * tax_rate).quantize(Decimal("0.01"))
     total = invoice_data.subtotal + tax_amount
