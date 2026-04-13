@@ -1,7 +1,7 @@
 """Invoice schemas."""
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
@@ -38,9 +38,17 @@ class InvoiceUpdate(BaseModel):
 
 
 class InvoiceStatusUpdate(BaseModel):
-    """Schema for updating invoice status."""
-    
-    status: InvoiceStatus = Field(..., description="New invoice status")
+    """Schema for updating invoice status.
+
+    Only PENDING (send a draft) and CANCELLED are accepted as targets here.
+    PAID is reachable only by recording a payment that satisfies the total
+    (see routers/payments.py). DRAFT is forward-only — invoices never move
+    backward through the state machine.
+    """
+
+    status: Literal[InvoiceStatus.PENDING, InvoiceStatus.CANCELLED] = Field(
+        ..., description="New invoice status (PENDING to send, CANCELLED to cancel)"
+    )
 
 
 class PaymentSummary(BaseModel):

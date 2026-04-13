@@ -22,6 +22,19 @@ from app.services.invoice_pdf import InvoicePDFService
 router = APIRouter(prefix="/v1/invoices", tags=["Invoices"])
 
 
+# Legal invoice status transitions via PATCH /v1/invoices/{id}/status.
+# PAID is intentionally excluded — the only way into PAID is via payment
+# records that satisfy the invoice total (see routers/payments.py), and
+# the only way out is by deleting payments until the sum drops below total.
+# DRAFT is excluded as a target — invoices move forward through the state
+# machine, never backward.
+# CANCELLED is terminal — no transitions out.
+ALLOWED_STATUS_TRANSITIONS: dict[InvoiceStatus, set[InvoiceStatus]] = {
+    InvoiceStatus.DRAFT: {InvoiceStatus.PENDING, InvoiceStatus.CANCELLED},
+    InvoiceStatus.PENDING: {InvoiceStatus.CANCELLED},
+}
+
+
 async def generate_invoice_number(db: AsyncSession, year: int) -> str:
     result = await db.execute(select(func.count(Invoice.id)).where(Invoice.year_billed == year))
     count = result.scalar() or 0
@@ -138,7 +151,21 @@ async def update_invoice_status(invoice_id: UUID, status_update: InvoiceStatusUp
     invoice = result.scalar_one_or_none()
     if not invoice:
         raise HTTPException(status_code=404, detail=f"Invoice with ID {invoice_id} not found")
-    invoice.status = status_update.status
+
+    target = status_update.status
+    allowed = ALLOWED_STATUS_TRANSITIONS.get(invoice.status, set())
+    if target not in allowed:
+        if target == InvoiceStatus.PAID:
+            raise HTTPException(
+                status_code=400,
+                detail="Invoice status cannot be set to PAID manually — record a payment instead.",
+            )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot transition invoice from {invoice.status.value} to {status_update.status.value}. Use payment operations to change PAID state.",
+        )
+
+    invoice.status = target
     await db.flush()
     await db.refresh(invoice)
     return build_invoice_response(invoice)
