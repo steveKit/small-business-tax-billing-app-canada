@@ -38,7 +38,12 @@ class Payment(Base, UUIDMixin):
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     payment_date: Mapped[date] = mapped_column(Date, nullable=False)
     payment_method: Mapped[PaymentMethod] = mapped_column(
-        Enum(PaymentMethod, name="payment_method", create_type=False),
+        Enum(
+            PaymentMethod,
+            name="payment_method",
+            create_type=False,
+            values_callable=lambda obj: [e.value for e in obj],
+        ),
         default=PaymentMethod.BANK_TRANSFER,
         nullable=False,
     )
