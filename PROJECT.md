@@ -5,7 +5,7 @@ See [[CLAUDE]] for agent conventions and [[TASKS]] for the work queue.
 ## Status
 
 **Phase:** Hardening
-**Last Updated:** 2026-04-10
+**Last Updated:** 2026-04-13
 
 The project was built in Feb 2026 as a personal Canadian sole-proprietor
 tax-holdback calculator + invoicing tool. It functions but is unhardened:
