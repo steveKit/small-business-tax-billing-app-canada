@@ -46,34 +46,6 @@ discovered in the plenary audit.
 
 ---
 
-### TASK-016: Fix PaymentMethod enum serialization (P0 hotfix) [`pending`] [`P0`] [`S`]
-**Dependencies:** none (P0 blocker)
-**Description:** Latent bug discovered session 004 the first time a payment was attempted. SQLAlchemy serializes `PaymentMethod.E_TRANSFER` as the member NAME (`'E_TRANSFER'`) instead of the member VALUE (`'e_transfer'`) because the `Enum(...)` column on `Payment.payment_method` is missing `values_callable`. Postgres rejects the uppercase name because the `payment_method` enum only contains lowercase values. Result: **every payment creation returns 500** with `asyncpg.exceptions.InvalidTextRepresentationError: invalid input value for enum payment_method: "E_TRANSFER"`.
-
-**Why latent until now:** Payment count has been 0 for the entire project's life — no payment ever successfully inserted. The buggy "Mark as Paid" button (removed in TASK-013) bypassed payment creation entirely by PATCHing status directly. Now that TASK-013 forces payment-driven transitions, the bug surfaces on the very first real payment attempt.
-
-**Fix:** Add `values_callable=lambda obj: [e.value for e in obj]` to the `Enum(...)` column on `Payment.payment_method`, mirroring the pattern already correctly used on `Invoice.status` (`backend/app/models/invoice.py` lines 50–59).
-
-**Files in scope:**
-- `backend/app/models/payment.py` — one-line addition on the `Enum(...)` call at lines 40–44
-- Grep audit across `backend/app/models/` for any other `Enum(X, name=..., create_type=False)` columns missing `values_callable`. If found, flag but do not fix in this task unless the fix is an identical one-liner.
-
-**Acceptance Criteria:**
-- [ ] `backend/app/models/payment.py` `Payment.payment_method` column has `values_callable=lambda obj: [e.value for e in obj]`, matching the `Invoice.status` pattern exactly
-- [ ] `POST /v1/payments` with `"payment_method": "e_transfer"` returns 201 (verified live via curl against the running backend)
-- [ ] At least one other payment method value (e.g. `bank_transfer` or `cash`) also tested successfully
-- [ ] After a successful payment that satisfies an invoice's total, the invoice's status auto-transitions to `paid` via the existing `routers/payments.py` lines 117–120 logic — verified by inspecting the invoice response after payment create
-- [ ] Grep audit of `backend/app/models/` completed; any other ORM Enum columns missing `values_callable` are documented in the task notes (and fixed if trivial)
-- [ ] Regression test deferred to Milestone 2 with a note (same deferral pattern as TASK-001, TASK-013, TASK-015)
-
-**Notes:**
-- **Discovered 2026-04-13** (session 004) when the user tried to record the real Adamson payments to close TASK-013's reconciliation loop. The 500 error surfaced a bug that had been sitting latently since project inception.
-- **Blocks real use of the tool.** No payment can be recorded until this lands. Blocks: TASK-013 reconciliation follow-through (real Adamson payments); TASK-007 integration verification (smoke test hits payment creation); any future production use.
-- **Dispatch mode:** standard (test-after). One-line fix mirroring an existing pattern in the same codebase; no design decisions.
-- **Sequencing:** dispatch IMMEDIATELY. After this merges, the user records the real Adamson payments via the normal UI flow — the existing `routers/payments.py` logic auto-transitions the invoices back to `paid`, closing the TASK-013 reconciliation loop.
-
----
-
 ### TASK-014: Replace `launch_url` with `FilePicker.save_file` for PDF download [`pending`] [`P1`] [`M`]
 **Dependencies:** none
 **Description:** The "Download PDF" button in `frontend/views/invoices.py` lines 188–191 calls `page.launch_url(pdf_url)`, which hands the URL to the OS for a browser to open. On WSLg this routes through GTK's `gtk_show_uri` → Wayland portal → `xdg_foreign`, a protocol WSLg's Weston-based compositor does not implement. Symptoms: `Gdk-WARNING: Server is missing xdg_foreign support` on every click, and the PDF either opens flakily via Windows interop or not at all — user cannot reliably download invoices from the Flet frontend.
@@ -366,8 +338,8 @@ _Tasks sketched; final decomposition at Milestone 7 plenary._
 ### Milestone 1: Stop the Bleeding (partial — session 004)
 
 **Completed:** 2026-04-13
-**PRs:** #10 — `feat(invoices): TASK-013 — payments as source of truth for invoice status`; #12 — `feat(invoices): TASK-015 — per-client invoice numbering`
-**Remaining in milestone:** TASK-003, TASK-006, TASK-016, TASK-014, TASK-007 (session 005+; TASK-016 discovered as a P0 hotfix while attempting the TASK-013 reconciliation follow-through; TASK-014 discovered as a P1 PDF-download UX issue)
+**PRs:** #10 — `feat(invoices): TASK-013 — payments as source of truth for invoice status`; #12 — `feat(invoices): TASK-015 — per-client invoice numbering`; #14 — `fix(models): TASK-016 — PaymentMethod enum values_callable (P0 hotfix)`
+**Remaining in milestone:** TASK-003, TASK-006, TASK-014, TASK-007 (session 005+; TASK-014 discovered as a P1 PDF-download UX issue)
 
 #### TASK-013: Make payments the source of truth for invoice status [`complete`] [`P1`] [`M`]
 **Dependencies:** none
@@ -435,6 +407,33 @@ _Tasks sketched; final decomposition at Milestone 7 plenary._
 - **Test invoices cleanup** — the 2 verification test invoices (Adamson-003 and BEE-002 with $0.01 totals) were created live during the director's post-implementer verification, then deleted by the user via `docker exec psql` after the safety hook correctly blocked the director from running destructive SQL.
 - **PR #12** squash-merged as `bd38aed` on main.
 - **M2 test backlog note (from reviewer finding #2):** when pytest infra lands in TASK-010, the `_slug_client_name` helper wants unit-test coverage for: empty string, whitespace-only, punctuation-only first word, non-ASCII-only first word ("日本"), leading-whitespace input, case preservation, digit-containing slug ("BEE2 Corp"), and a full "O'Reilly & Sons" happy path. Add to TASK-011 or TASK-012 decomposition when M2 opens.
+
+#### TASK-016: Fix PaymentMethod enum serialization (P0 hotfix) [`complete`] [`P0`] [`S`]
+**Dependencies:** none (P0 blocker)
+**Description:** Latent bug that had been in the codebase since project inception: SQLAlchemy was serializing `PaymentMethod.E_TRANSFER` as the member NAME (`'E_TRANSFER'`) instead of its VALUE (`'e_transfer'`) because the `Enum(...)` column on `Payment.payment_method` was missing `values_callable`. Postgres's `payment_method` enum only accepts the lowercase values, so every payment creation was returning 500 with `asyncpg.exceptions.InvalidTextRepresentationError`.
+
+**Why latent until session 004:** Payments count had been 0 for the entire project's life — no payment had ever successfully inserted. The buggy "Mark as Paid" button (removed in TASK-013) bypassed payment creation by PATCHing invoice status directly. TASK-013 forcing payment-driven transitions surfaced the bug on the very first real payment attempt.
+
+**Fix:** One-line port of the already-correct `Invoice.status` pattern (`backend/app/models/invoice.py` lines 50–59) to `Payment.payment_method`. Added `values_callable=lambda obj: [e.value for e in obj]` to the `Enum(...)` column.
+
+**Files in scope (changed):**
+- `backend/app/models/payment.py` — one file, +6/-1 lines. Multi-line reformatting of the `Enum(...)` call to match the `Invoice.status` style exactly.
+
+**Acceptance Criteria:**
+- [x] `Payment.payment_method` column has `values_callable=lambda obj: [e.value for e in obj]`, matching the `Invoice.status` pattern exactly
+- [x] `POST /v1/payments` with `"payment_method": "e_transfer"` returns 201 — verified live via curl (response shows lowercase `"e_transfer"`)
+- [x] Second enum value tested: `"payment_method": "bank_transfer"` also returns 201 — verified live via curl
+- [x] Invoice auto-transition boundary verified: 2 × $0.01 payments on a $10,170 invoice correctly kept the invoice in `pending` (transition to `paid` fires only when sum ≥ total, as designed)
+- [x] Grep audit of `backend/app/models/` completed: only two ORM Enum columns exist (`Invoice.status` already correct; `Payment.payment_method` fixed by this PR). No other latent enum serialization bugs in the models layer.
+- [x] Regression test deferred to Milestone 2 (same pattern as TASK-001, TASK-013, TASK-015)
+
+**Notes:**
+- **Discovered 2026-04-13** (session 004) when the user tried to record the real Adamson payments to close TASK-013's reconciliation loop. The 500 error surfaced a bug that had been sitting latently since project inception. Fastest discovery-to-merge cycle of the session: diagnosis → dispatch → verification → PR → merge in under 30 minutes.
+- **Full round-trip verification:** Director created 2 test payments (\$0.01 each, `e_transfer` and `bank_transfer`), verified 201 + correct response, DELETEd both via `/v1/payments/{id}`, verified 204, and re-queried the live db to confirm 0 payments + 2 pending invoices unchanged. No residual test data, no SQL cleanup needed.
+- **Side effect observed:** Each successful payment creation triggered `BackupService.create_backup('auto')` per `routers/payments.py` lines 125–126, writing two `.sql` backup files to the bind-mounted `backups/` directory. Harmless (correct TASK-001 behavior) and left in place for user management; will be swept up by TASK-006's cleanup pass.
+- **Fast-tracked** per the user's "A" response on review option. Rationale: one-line port of a known-good pattern, full live round-trip verification, P0 blocker, director's grep audit confirmed no sibling bugs. No independent reviewer dispatch.
+- **Stale CLAUDE.md gotcha also applies to the PaymentMethod situation** — the current Gotchas list notes "Auto-backup code path is currently broken" (TASK-001 already fixed this). Separately, the PaymentMethod/values_callable trap is worth a new Gotcha line warning future developers. Flag for the stale-gotcha cleanup PR already logged in Discovered Work.
+- **PR #14** squash-merged as `673e4d0` on main.
 
 ---
 
