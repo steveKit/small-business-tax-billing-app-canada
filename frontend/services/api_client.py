@@ -166,7 +166,29 @@ class APIClient:
         return response.json().get("provinces", [])
     
     # ==================== Backup ====================
-    
+
+    def get_backup_download(self) -> tuple[bytes, str]:
+        """Fetch a full database backup as bytes plus the server-suggested filename.
+
+        The backend serves `GET /v1/backup/download` with a `Content-Disposition:
+        attachment; filename="..."` header. We extract the filename from that
+        header so the FilePicker dialog can suggest it as the default save name.
+        Returns a `(bytes, filename)` tuple. Falls back to `"backup.sql"` if the
+        header is missing or unparseable.
+        """
+        response = self.client.get(self._url("/v1/backup/download"))
+        response.raise_for_status()
+
+        filename = "backup.sql"
+        disposition = response.headers.get("content-disposition", "")
+        # Cheap parser: matches `filename="..."` with double quotes
+        if 'filename="' in disposition:
+            start = disposition.index('filename="') + len('filename="')
+            end = disposition.index('"', start)
+            filename = disposition[start:end]
+
+        return response.content, filename
+
     def restore_backup(self, sql_content: bytes, filename: str) -> dict:
         """Restore database from SQL backup file."""
         files = {"file": (filename, sql_content, "application/sql")}
