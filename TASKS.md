@@ -46,45 +46,6 @@ discovered in the plenary audit.
 
 ---
 
-### TASK-013: Make payments the source of truth for invoice status [`pending`] [`P1`] [`M`]
-**Dependencies:** none
-**Description:** Invoices can currently be marked `PAID` via `PATCH /v1/invoices/{id}/status` with no payment records existing, after which the Flet UI blocks both adding a payment and reverting the status — the invoice becomes permanently stuck in an inconsistent state. Root cause: `update_invoice_status` (`backend/app/routers/invoices.py` lines 135–145) performs an unconditional status assignment with no transition validation, and the Flet invoice view exposes a "Mark as Paid" button that drives that endpoint directly.
-
-**Chosen approach:** **Option A — Payments are the source of truth.** The only path to `PAID` is a payment (or sum of payments) that satisfies the invoice total. The manual PATCH endpoint is restricted to the legal non-PAID transitions: `DRAFT → PENDING` (send), any → `CANCELLED`. The "Mark as Paid" button is removed from the Flet invoice view entirely. Options B (transition table with "Mark Unpaid") and C (auto-create payment modal) were considered and rejected in favor of the simpler model that matches how a sole-prop actually thinks about invoices.
-
-**Files in scope:**
-- `backend/app/routers/invoices.py` — rewrite `update_invoice_status` with an allowed-transition whitelist; explicitly reject any request that sets status to `PAID`
-- `backend/app/schemas/invoice.py` — constrain `InvoiceStatusUpdate.status` to the allowed subset (exclude `PAID`) so the rejection happens at the pydantic boundary, not in the handler
-- `backend/app/routers/payments.py` — verify the existing auto-transition to `PAID` on payment creation (lines 117–120) still fires correctly; no behavior change intended
-- `frontend/` — locate and remove the "Mark as Paid" button from wherever it lives in the Flet invoice view (likely `frontend/views/invoices.py` or `frontend/views/invoice_detail.py`)
-- Data audit: reconcile any existing invoice currently in the buggy state (`status=PAID` with `sum(payments) < total`) before dispatch — the current db has 2 invoices, 0 payments, so at least one may be affected
-
-**Acceptance Criteria:**
-- [ ] `PATCH /v1/invoices/{id}/status` returns 400 (or 422 from pydantic) when the target status is `PAID`, with a detail message: "Invoice status cannot be set to PAID manually — record a payment instead."
-- [ ] `PATCH /v1/invoices/{id}/status` returns 400 for any transition not in the whitelist: `DRAFT → PENDING`, `DRAFT → CANCELLED`, `PENDING → CANCELLED`
-- [ ] A valid `DRAFT → PENDING` transition (send invoice) still works end-to-end
-- [ ] The Flet invoice view has no "Mark as Paid" button anywhere; status display is read-only and driven by backend state
-- [ ] Recording a payment that satisfies the invoice total still auto-transitions the invoice to `PAID` (no regression on existing `routers/payments.py` lines 117–120 logic)
-- [ ] Data audit completed: any invoice currently in the buggy state is reconciled manually (either by adding the real payment records that support the `PAID` status, or by PATCHing back to `PENDING`)
-- [ ] Manual QA walkthrough: create invoice → send → attempt `curl -X PATCH .../status -d '{"status":"paid"}'` returns 400 → record payment via Flet UI → invoice auto-transitions to `PAID` → tax summary reflects the payment
-- [ ] Regression test deferred to Milestone 2 with a note (no pytest infra yet — same deferral pattern as TASK-001). Add a line to TASK-011 or TASK-012 scope noting this endpoint needs coverage once test infra lands.
-
-**Notes:**
-- **Discovered 2026-04-13** (session 004) while user was verifying the tool post-backend-recovery. The `mark paid` button lured them into the broken state and the only escape was direct DB manipulation.
-- **Sequencing suggestion:** dispatch this BEFORE TASK-003. TASK-013 is non-destructive (code + frontend only), so fixing it first lets the user audit and reconcile the 2 existing invoices against the real data. TASK-003 wipes the volume afterward, so post-TASK-003 the "2 invoices" audit is moot, but pre-TASK-003 you at least know what real state you're trying to preserve in the backup.
-- **Auth note for Milestone 3 plenary:** the PATCH endpoint has no auth (fine for M1 since all endpoints are unauthenticated until M3), but the blast radius of an open status-mutation endpoint is worth flagging during the M3 plenary.
-- **Data audit query:**
-  ```sql
-  SELECT i.id, i.status, i.total, COALESCE(SUM(p.amount), 0) AS paid
-  FROM invoices i
-  LEFT JOIN payments p ON p.invoice_id = i.id
-  GROUP BY i.id
-  HAVING i.status = 'paid' AND COALESCE(SUM(p.amount), 0) < i.total;
-  ```
-- **Dispatch mode:** standard (test-after). Pure logic is minimal; most of the work is a validation table + frontend button removal.
-
----
-
 ### TASK-015: Per-client invoice numbering `{year}-{client_slug}-{seq}` [`pending`] [`P1`] [`M`]
 **Dependencies:** none (but MUST be preceded by a fresh `pg_dump` backup because it mutates existing rows)
 **Description:** Change invoice-number format from the current global-per-year format (`INV-2026-0001`) to per-client-per-year (`{year}-{client_slug}-{seq:03d}`). Migrate the 3 existing invoices in the live db to the new format as part of the same change.
@@ -391,6 +352,46 @@ _Tasks sketched; final decomposition at Milestone 7 plenary._
 
 ---
 
+### Milestone 1: Stop the Bleeding (partial — session 004)
+
+**Completed:** 2026-04-13
+**PRs:** #10 — `feat(invoices): TASK-013 — payments as source of truth for invoice status`
+**Remaining in milestone:** TASK-003, TASK-006, TASK-015, TASK-007 (next session)
+
+#### TASK-013: Make payments the source of truth for invoice status [`complete`] [`P1`] [`M`]
+**Dependencies:** none
+**Description:** Invoices could be marked `PAID` via `PATCH /v1/invoices/{id}/status` with no payment records existing, leaving them permanently stuck in an inconsistent state — the Flet UI blocked both adding a payment and reverting the status. Root cause: `update_invoice_status` performed an unconditional status assignment with no transition validation, and the Flet invoice view exposed a "Mark as Paid" button that drove that endpoint directly.
+
+**Chosen approach:** Option A — payments are the source of truth. The only path to `PAID` is a payment (or sum of payments) that satisfies the invoice total. Manual PATCH is restricted to legal non-PAID transitions (DRAFT→PENDING, DRAFT→CANCELLED, PENDING→CANCELLED). The "Mark as Paid" button is removed from the Flet invoice view entirely.
+
+**Files in scope (changed):**
+- `backend/app/routers/invoices.py` — added `ALLOWED_STATUS_TRANSITIONS` whitelist; rewrote `update_invoice_status` with transition check; added handler docstring explaining the 422/400 error contract (post-review fixup)
+- `backend/app/schemas/invoice.py` — constrained `InvoiceStatusUpdate.status` to `Literal[InvoiceStatus.PENDING, InvoiceStatus.CANCELLED]` (defense in depth)
+- `frontend/views/invoices.py` — removed the "Mark as Paid" `IconButton`
+
+**Acceptance Criteria:**
+- [x] `PATCH /v1/invoices/{id}/status` rejects target=`PAID`: 422 from pydantic `Literal` rejection (request-boundary), with a PAID-specific 400 branch in the handler for programmatic bypass (`"Invoice status cannot be set to PAID manually — record a payment instead."`). Verified via curl.
+- [x] `PATCH /v1/invoices/{id}/status` returns 400 for illegal transitions not in the whitelist — verified via curl on `PENDING → PENDING`.
+- [ ] Valid `DRAFT → PENDING` transition still works end-to-end — **not live-tested** (would have mutated the real BEE draft). Static analysis + reviewer's full code trace confirm; live regression deferred to Milestone 2 pytest infra.
+- [x] The Flet invoice view has no "Mark as Paid" button anywhere — verified via grep.
+- [ ] Recording a payment that satisfies the invoice total still auto-transitions to `PAID` — **not live-tested** (would have required recording a real payment on a real invoice). `routers/payments.py` lines 117–120 unchanged; reviewer traced the path and confirmed no regressions. Live verification deferred to Milestone 2 and to the user's natural post-merge workflow (recording the real Adamson payments).
+- [x] Data audit + reconciliation: the 2 stuck Adamson invoices (INV-2026-0001, INV-2026-0002) were reconciled from `paid` to `pending` via a transactional SQL UPDATE pre-dispatch, with `pg_dump` backups captured at `~/tax-billing-backup-20260413-111707.sql` (pre-reconcile) and `~/tax-billing-backup-20260413-115039.sql` (post-reconcile).
+- [ ] Full manual QA walkthrough (create → send → PATCH rejection → record payment → auto-transition → tax summary) — **partial**. The curl rejection portion was verified. The payment-recording → auto-transition → tax summary portion is deferred to the user's natural post-merge workflow.
+- [x] Regression test deferred to Milestone 2 with a note (same pattern as TASK-001).
+
+**Notes:**
+- **Discovered 2026-04-13** (session 004) while the user was verifying the tool post-backend-recovery. The "Mark as Paid" button lured the user into the broken state and the only escape was direct DB manipulation.
+- **Reviewer findings (PR #10):**
+  - #1 (minor — misleading "Use payment operations to change PAID state" text appended to every non-PAID rejection) — **fixed** in fixup commit `a99a9b6`: trailing sentence dropped from the generic-rejection branch.
+  - #2 (minor — undocumented 422/400 error contract) — **fixed** in fixup commit `a99a9b6`: handler docstring added explaining the defense-in-depth split.
+  - #3 (minor — whitelist narrowness: no PAID→CANCELLED refund path) — **intentionally not fixed**. Matches Canadian sole-prop accounting practice (credit notes / negative-payment refunds, never a direct cancel of a paid invoice). Current refund path: delete payments → auto-reverts `PAID→PENDING` via `routers/payments.py` → manual PATCH `PENDING→CANCELLED`. User confirmed acceptance.
+- **Defense in depth** — the `Literal[PENDING, CANCELLED]` schema constraint and the handler `ALLOWED_STATUS_TRANSITIONS` check are genuinely layered, not redundant. Schema catches target=`PAID` at request parse time (422); handler catches source-state rules the schema cannot express (`PENDING→PENDING`, anything from `CANCELLED` or `PAID`, etc.) with 400. Split is documented in the handler docstring.
+- **Pre-dispatch data reconciliation** — before dispatching the implementer, the director ran a transactional SQL `UPDATE` to mark the 2 bugged Adamson invoices as `pending`. User intends to record the real payments via the normal UI flow post-merge; those will re-transition the invoices to `PAID` via the existing `routers/payments.py` auto-transition logic.
+- **Stale CLAUDE.md gotcha discovered** — TASK-013's implementer noticed the "Auto-backup code path is currently broken" bullet in CLAUDE.md § Gotchas is stale; TASK-001 fixed the code path but the doc was never updated. Logged in Discovered Work below for a separate docs PR.
+- **PR #10** squash-merged as `5a44a4e` on main.
+
+---
+
 ## Discovered Work
 
 _Tasks found during implementation that weren't in the original plan. User decides when/whether to promote these to Active Tasks._
@@ -400,3 +401,4 @@ _Tasks found during implementation that weren't in the original plan. User decid
 - **Line-ending drift / add `.gitattributes`** (session 003, PR #5) — repo has mixed CRLF/LF line endings. During TASK-002 edits, `docker-compose.yml` and `.env.example` flipped CRLF→LF, inflating diffs. Adding a `.gitattributes` with `* text=auto eol=lf` would normalize and prevent future churn. Small, cosmetic. Proposed home: Milestone 6 or a one-off chore before Milestone 2.
 - **Unused `from typing import Optional` in `backend/app/config.py`** (session 003, PR #5 review) — will be caught by ruff in Milestone 2 (TASK-008); no action needed now.
 - **Redundant `env_file: .env` on the `db` compose service** (session 003, PR #5 review, minor nit) — the `environment:` block already declares the `POSTGRES_*` vars via `${...}` substitution, so the `env_file:` line is redundant for its stated purpose. Also injects unrelated vars (JWT_SECRET_KEY, API_URL) into the postgres container environment, which is not a security hole but is slightly broader than necessary. Drop if revisiting compose in TASK-007 or later.
+- **Stale CLAUDE.md gotcha re: auto-backup crash path** (session 004, TASK-013 implementer observation) — CLAUDE.md § Gotchas still contains the "Auto-backup code path is currently broken" bullet, but TASK-001 fixed that code path in session 003 (PR #4). The gotcha is misleading for any future agent or human reading the file. One-line deletion from `CLAUDE.md`. Not urgent; just misleading. Proposed home: next docs/chore window, or bundle with another M1 task's PR.
