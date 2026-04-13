@@ -48,9 +48,6 @@ class SettingsView:
         # File picker for restore
         file_picker = ft.FilePicker(on_result=lambda e: handle_restore_file(e))
 
-        # File picker for backup save-as (TASK-014 — replaces launch_url)
-        backup_file_picker = ft.FilePicker()
-        
         def close_dialog(e=None): self.page.close(edit_dialog)
         
         edit_dialog = ft.AlertDialog(modal=True, title=ft.Text("Edit Tax Bracket"),
@@ -225,28 +222,10 @@ class SettingsView:
             except Exception as ex: show_error(f"Error saving presumed income: {str(ex)}")
         
         def download_backup(e):
-            try:
-                sql_bytes, suggested_name = self.api.get_backup_download()
-            except Exception as ex:
-                show_error(f"Backup fetch failed: {str(ex)}")
-                return
-
-            def on_save_result(result: ft.FilePickerResultEvent):
-                if not result.path:
-                    return  # user cancelled (bytes are garbage-collected)
-                try:
-                    with open(result.path, "wb") as f:
-                        f.write(sql_bytes)
-                    show_success(f"Backup saved to {result.path}")
-                except Exception as ex:
-                    show_error(f"Backup write failed: {str(ex)}")
-
-            backup_file_picker.on_result = on_save_result
-            backup_file_picker.save_file(
-                file_name=suggested_name,
-                dialog_title="Save backup as…",
-                allowed_extensions=["sql"],
-            )
+            # Open backup download URL in browser
+            backup_url = "http://localhost:8000/v1/backup/download"
+            self.page.launch_url(backup_url)
+            show_success("Backup download started")
         
         def handle_restore_file(e: ft.FilePickerResultEvent):
             if e.files and len(e.files) > 0:
@@ -266,7 +245,6 @@ class SettingsView:
         
         content = ft.Column([
             file_picker,
-            backup_file_picker,
             ft.Text("Settings", size=32, weight=ft.FontWeight.BOLD),
             ft.Divider(),
             ft.Card(content=ft.Container(content=ft.Column([
