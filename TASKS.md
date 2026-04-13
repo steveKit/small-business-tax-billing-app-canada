@@ -85,14 +85,70 @@ discovered in the plenary audit.
 
 ---
 
+### TASK-015: Per-client invoice numbering `{year}-{client_slug}-{seq}` [`pending`] [`P1`] [`M`]
+**Dependencies:** none (but MUST be preceded by a fresh `pg_dump` backup because it mutates existing rows)
+**Description:** Change invoice-number format from the current global-per-year format (`INV-2026-0001`) to per-client-per-year (`{year}-{client_slug}-{seq:03d}`). Migrate the 3 existing invoices in the live db to the new format as part of the same change.
+
+**Format rules:**
+- `{year}` — `invoices.year_billed` (already exists as a generated column)
+- `{client_slug}` — the first whitespace-delimited word of `clients.name`, stripped to `[A-Za-z0-9]` only, preserving case. Examples: `"Adamson Systems Engineering"` → `Adamson`; `"BEE"` → `BEE`; `"O'Reilly & Sons"` → `OReilly`.
+- `{seq:03d}` — per-client-per-year sequence, 3-digit zero-padded, starts at `001`, resets each year
+- Example outputs: `2026-Adamson-001`, `2026-Adamson-002`, `2026-BEE-001`, `2027-Adamson-001`
+
+**Files in scope:**
+- `backend/app/routers/invoices.py` — rewrite `generate_invoice_number` to query `WHERE year_billed = year AND client_id = client_id`; new signature `generate_invoice_number(db, year, client_id) -> str`; add a module-level `_slug_client_name(name: str) -> str` helper with docstring + a handful of inline examples
+- `backend/app/services/invoice_pdf.py:95` — no code change expected (filename format `Invoice-{invoice_number}.pdf` still works), but verify
+- `backend/app/templates/invoice.html` — no change expected (template just renders `{{ invoice_number }}`), but verify
+- `frontend/views/invoices.py` and any detail view — verify no hardcoded `INV-` prefix or regex assumption; likely zero frontend code changes but must grep to confirm
+- One-off migration SQL committed under `database/migrations/` or embedded in the task notes as a `psql` script — user runs against live db
+
+**Data migration (one-off, wrapped in a transaction):**
+```sql
+BEGIN;
+UPDATE invoices SET invoice_number = '2026-Adamson-001'
+  WHERE id = '12d0c02b-24d2-4129-9fec-822bcbad3e34';
+UPDATE invoices SET invoice_number = '2026-Adamson-002'
+  WHERE id = '8b3deea9-2b84-4910-b1c0-1f73c30eabbf';
+UPDATE invoices SET invoice_number = '2026-BEE-001'
+  WHERE id = '086d67f3-c741-4d76-8ed9-34193cfde7c2';
+-- Verify before commit:
+-- SELECT id, invoice_number FROM invoices ORDER BY created_at;
+COMMIT;
+```
+
+**Acceptance Criteria:**
+- [ ] `_slug_client_name` helper exists with docstring documenting the "first whitespace-delimited word, alphanumeric only, preserving case" rule
+- [ ] `generate_invoice_number` signature and query changed to scope by both `year_billed` and `client_id`; returns `{year}-{slug}-{seq:03d}` format
+- [ ] Existing 3 invoices migrated via the transactional SQL above (run against live db)
+- [ ] Post-migration API response (`GET /v1/invoices`) shows new `invoice_number` values for all 3 rows
+- [ ] Generated PDFs for migrated invoices reflect new numbers in both filename (`Invoice-2026-Adamson-001.pdf`) and rendered body
+- [ ] Manual QA: create a new Adamson invoice via Flet, verify number is `2026-Adamson-003`
+- [ ] Manual QA: create a new BEE invoice via Flet, verify number is `2026-BEE-002`
+- [ ] Grep `grep -rn "INV-" frontend/ backend/` finds zero matches outside of comments or historical-reference strings
+- [ ] Regression test deferred to Milestone 2 (no pytest infra yet — same pattern as TASK-001, TASK-013)
+
+**Notes:**
+- **Discovered 2026-04-13** (session 004) after the user pulled the 3 existing PDFs and decided the global-per-year scheme was harder to reference than a per-client sequence.
+- **Slug rule (a) chosen** over (c) an explicit `clients.short_name` column. Rationale: zero schema change means no volume wipe, no DDL drift, no Alembic pre-work. If client names ever collide under rule (a) (e.g., two clients both starting with "Adam..."), revisit with an explicit `short_name` field once Alembic lands in Milestone 4.
+- **Inherited race condition** in `generate_invoice_number`: count-then-insert with no row-level lock. Two concurrent creates for the same client+year could race to the same sequence number. The `UNIQUE` constraint on `invoice_number` would at least surface the collision as a 500 instead of silent overwrite. Not fixed here — personal single-user tool, acceptable risk. Flag for a Milestone 6 hardening task.
+- **Mapping confirmation** (from `created_at` order on 2026-04-13):
+  - `INV-2026-0001` (Adamson, 2026-02-09 19:02 UTC) → `2026-Adamson-001`
+  - `INV-2026-0002` (Adamson, 2026-02-09 20:09 UTC) → `2026-Adamson-002`
+  - `INV-2026-0003` (BEE, 2026-04-13 14:36 UTC) → `2026-BEE-001` (matches user's "invoice 1 for BEE" request)
+- **Sequencing within Milestone 1:** dispatch this *after* TASK-013 (so the invoice state is consistent before renaming) and *before* TASK-003 (so the pre-wipe backup captures the renamed rows, and the post-wipe restore comes back with the new numbers). Recommended order: TASK-013 → TASK-015 → fresh pg_dump → TASK-003 → TASK-006 → TASK-007.
+- **Dispatch mode:** standard (test-after). Small code change plus a 3-row data migration; no test infra yet.
+
+---
+
 ### TASK-007: Integration — Milestone 1 verification [`pending`] [`P0`] [`S`]
-**Dependencies:** TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-013
+**Dependencies:** TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-013, TASK-015
 **Description:** End-to-end verification that Milestone 1 left the tool in a working state. Wiring audit per plenary checklist; ensures no orphaned new modules.
 **Acceptance Criteria:**
 - [ ] `docker compose down -v && docker compose up -d` rebuilds cleanly with new `.env`
 - [ ] Backend `/health` returns 200 from `127.0.0.1`
 - [ ] Frontend (host-mode `mise run desktop` for now) can load dashboard, create client, create invoice, record payment without crashing the auto-backup path
 - [ ] Invoice status flow smoke-tested: direct PATCH to `PAID` rejected; payment-driven transition to `PAID` still works (TASK-013 regression check)
+- [ ] Invoice numbering smoke-tested: new invoice for Adamson lands as `2026-Adamson-NNN`; new invoice for BEE lands as `2026-BEE-NNN`; existing 3 rows migrated (TASK-015 regression check)
 - [ ] Grep for any remaining hardcoded secrets / deprecations — all zero matches (excluding `.env.example` and `.git/`): `grep -rn --exclude=.env.example --exclude-dir=.git -E "postgres:postgres|change-this-secret|your-secret-key|utcnow" .`
 - [ ] Milestone 1 tag created: `milestone-01-stop-the-bleeding`
 
