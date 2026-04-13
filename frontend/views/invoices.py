@@ -1,5 +1,6 @@
 """Invoices view with edit functionality."""
 from datetime import date, timedelta
+from pathlib import Path
 import flet as ft
 from services.api_client import APIClient
 
@@ -20,7 +21,10 @@ class InvoicesView:
     
     def build(self) -> ft.Control:
         current_year = date.today().year
-        
+
+        # File picker for PDF save-as (TASK-014 — replaces launch_url)
+        pdf_file_picker = ft.FilePicker()
+
         data_table = ft.DataTable(
             columns=[
                 ft.DataColumn(ft.Text("Invoice #")),
@@ -185,11 +189,37 @@ class InvoicesView:
                 show_error(f"Error updating status: {str(ex)}")
         
         def download_pdf(invoice_id: str):
-            # Use localhost URL for browser access (not Docker internal hostname)
-            pdf_url = f"http://localhost:8000/v1/invoices/{invoice_id}/pdf"
-            self.page.launch_url(pdf_url)
-        
+            # Look up invoice_number for the default filename
+            invoice = next((i for i in self.invoices if i.get("id") == invoice_id), None)
+            default_name = f"Invoice-{invoice.get('invoice_number', 'unknown')}.pdf" if invoice else "invoice.pdf"
+
+            # Token guards against rapid re-click across different invoices: if a
+            # later save_file() supersedes this one, the stale callback skips.
+            my_token = object()
+            pdf_file_picker.data = my_token
+
+            def on_save_result(e: ft.FilePickerResultEvent):
+                if pdf_file_picker.data is not my_token:
+                    return  # superseded by a later download click
+                if not e.path:
+                    return  # user cancelled
+                try:
+                    pdf_bytes = self.api.get_invoice_pdf(invoice_id)
+                    with open(e.path, "wb") as f:
+                        f.write(pdf_bytes)
+                    show_success(f"Saved {Path(e.path).name} to {e.path}")
+                except Exception as ex:
+                    show_error(f"Download failed: {str(ex)}")
+
+            pdf_file_picker.on_result = on_save_result
+            pdf_file_picker.save_file(
+                file_name=default_name,
+                dialog_title="Save invoice PDF as…",
+                allowed_extensions=["pdf"],
+            )
+
         content = ft.Column([
+            pdf_file_picker,
             ft.Row([
                 ft.Text("Invoices", size=32, weight=ft.FontWeight.BOLD),
                 ft.ElevatedButton("Create Invoice", icon=ft.icons.ADD, on_click=open_add_dialog),
