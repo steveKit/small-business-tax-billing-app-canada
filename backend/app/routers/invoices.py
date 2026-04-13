@@ -147,6 +147,24 @@ async def update_invoice(invoice_id: UUID, invoice_data: InvoiceUpdate, db: Asyn
 
 @router.patch("/{invoice_id}/status", response_model=InvoiceResponse)
 async def update_invoice_status(invoice_id: UUID, status_update: InvoiceStatusUpdate, db: AsyncSession = Depends(get_db)):
+    """Update an invoice's status via a legal state-machine transition.
+
+    Error contract:
+    - 422: target is not in InvoiceStatusUpdate's Literal (rejected at
+      request parsing — callers sending 'paid' or 'draft' land here).
+    - 400 with PAID-specific detail: caller bypassed the schema and
+      sent PAID at the handler level. Defense-in-depth; not reachable
+      from a normal HTTP client but guards against programmatic misuse.
+    - 400 with generic detail: target is syntactically valid but not
+      reachable from the current status per ALLOWED_STATUS_TRANSITIONS
+      (e.g., PENDING→PENDING, or anything out of CANCELLED/PAID state).
+    - 404: invoice not found.
+
+    The 422/400 split is intentional defense-in-depth between the
+    pydantic schema and the handler whitelist. API clients should treat
+    both as "illegal transition". Unifying to a single error shape is
+    deferred to Milestone 2 when test infra lands.
+    """
     result = await db.execute(select(Invoice).options(selectinload(Invoice.client), selectinload(Invoice.payments)).where(Invoice.id == invoice_id))
     invoice = result.scalar_one_or_none()
     if not invoice:
@@ -162,7 +180,7 @@ async def update_invoice_status(invoice_id: UUID, status_update: InvoiceStatusUp
             )
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot transition invoice from {invoice.status.value} to {status_update.status.value}. Use payment operations to change PAID state.",
+            detail=f"Cannot transition invoice from {invoice.status.value} to {status_update.status.value}.",
         )
 
     invoice.status = target
