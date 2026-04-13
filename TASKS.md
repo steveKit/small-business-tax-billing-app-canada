@@ -46,43 +46,6 @@ discovered in the plenary audit.
 
 ---
 
-### TASK-014: Replace `launch_url` with `FilePicker.save_file` for PDF download [`pending`] [`P1`] [`M`]
-**Dependencies:** none
-**Description:** The "Download PDF" button in `frontend/views/invoices.py` lines 188–191 calls `page.launch_url(pdf_url)`, which hands the URL to the OS for a browser to open. On WSLg this routes through GTK's `gtk_show_uri` → Wayland portal → `xdg_foreign`, a protocol WSLg's Weston-based compositor does not implement. Symptoms: `Gdk-WARNING: Server is missing xdg_foreign support` on every click, and the PDF either opens flakily via Windows interop or not at all — user cannot reliably download invoices from the Flet frontend.
-
-The backend endpoint `GET /v1/invoices/{id}/pdf` is correct (sends bytes with `Content-Disposition: attachment`). The bug is entirely on the Flet frontend side: the button label says "Download" but the code just hands a URL to the OS and hopes.
-
-**Proposed fix (Option 1 — FilePicker save):** Replace `launch_url` with a proper Flet-native file save flow using `ft.FilePicker.save_file`, mirroring the pattern already used for backup download in `frontend/views/settings.py:49`. The flow:
-1. Click "Download PDF" → call `self.api.get_invoice_pdf(invoice_id)` (already exists at `frontend/services/api_client.py:73`, returns `bytes`) to fetch PDF bytes
-2. Open `ft.FilePicker.save_file` dialog with a default filename (`Invoice-<number>.pdf`, where `<number>` is the new `2026-Adamson-001` style)
-3. On dialog confirm, write the bytes to the user-chosen path
-4. Toast `Saved to <path>` with a button to open the containing folder
-
-This is platform-agnostic (WSLg / native Linux / containerized web mode), eliminates all xdg-open / portal / xdg_foreign issues, and makes "Download" match the button label.
-
-**Files in scope:**
-- `frontend/views/invoices.py` — replace `download_pdf` helper (lines 188–191) and wire up a `FilePicker` instance on the view
-- `frontend/views/settings.py:227` — the backup-download uses the same `launch_url(backup_url)` anti-pattern and has the same xdg_foreign issue lurking. Include the same FilePicker fix here — same file tree, same pattern, same one-shot dispatch. Or flag as explicit follow-up if scope creep feels real.
-- `frontend/services/api_client.py` — verify `get_invoice_pdf(invoice_id) -> bytes` behaves correctly with the full chunked response body (should be fine; it uses `httpx.get().content`)
-
-**Acceptance Criteria:**
-- [ ] The "Download PDF" button no longer calls `launch_url`
-- [ ] Clicking the button opens an `ft.FilePicker.save_file` dialog with a default filename derived from the invoice number (e.g. `Invoice-2026-Adamson-001.pdf`)
-- [ ] Saving to the chosen path writes valid PDF bytes (verify with `file <path>` showing `PDF document`)
-- [ ] No `Gdk-WARNING` or `xdg_foreign` messages emitted on click
-- [ ] Works in both containerized web mode and native desktop mode
-- [ ] Settings view's backup-download button either fixed the same way, or logged as an explicit follow-up task if scope-creep concerns win out
-- [ ] Manual QA: download at least one real invoice (`2026-Adamson-001` or similar); verify the file opens in the host's PDF viewer
-- [ ] Regression test deferred to Milestone 2
-
-**Notes:**
-- **Discovered 2026-04-13** (session 004) when user first tried to download PDFs from the Flet frontend and hit the xdg_foreign warning. Workaround used during the session: curl directly against `http://127.0.0.1:8000/v1/invoices/{id}/pdf` from the host — works fine, files saved at `/home/horse/tax-billing-invoices/`.
-- **Not blocking TASK-007 integration verification.** User can pull invoices via curl. TASK-014 is P1 "fix the UX" not P0 "restore a broken flow".
-- **Alternative considered and rejected:** `apt install wslu` + `export BROWSER=wslview` as a host-side workaround. Rejected because it only helps WSLg users, the fix doesn't live in version control, and every new Windows dev environment would need the same incantation. The FilePicker approach is code-level, portable, and documented in source.
-- **Dispatch mode:** standard (test-after). UI change + API bytes fetching; minimal pure logic.
-
----
-
 ### TASK-007: Integration — Milestone 1 verification [`pending`] [`P0`] [`S`]
 **Dependencies:** TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-013, TASK-015, TASK-016
 **Description:** End-to-end verification that Milestone 1 left the tool in a working state. Wiring audit per plenary checklist; ensures no orphaned new modules.
@@ -338,8 +301,8 @@ _Tasks sketched; final decomposition at Milestone 7 plenary._
 ### Milestone 1: Stop the Bleeding (partial — session 004)
 
 **Completed:** 2026-04-13
-**PRs:** #10 — `feat(invoices): TASK-013 — payments as source of truth for invoice status`; #12 — `feat(invoices): TASK-015 — per-client invoice numbering`; #14 — `fix(models): TASK-016 — PaymentMethod enum values_callable (P0 hotfix)`
-**Remaining in milestone:** TASK-003, TASK-006, TASK-014, TASK-007 (session 005+; TASK-014 discovered as a P1 PDF-download UX issue)
+**PRs:** #10 — `feat(invoices): TASK-013 — payments as source of truth for invoice status`; #12 — `feat(invoices): TASK-015 — per-client invoice numbering`; #14 — `fix(models): TASK-016 — PaymentMethod enum values_callable (P0 hotfix)`; #16 — `feat(frontend): TASK-014 — FilePicker save for PDF and backup downloads` + #18 — `hotfix(frontend): revert TASK-014 FilePicker approach — save_file is web-unsupported`
+**Remaining in milestone:** TASK-003, TASK-006, TASK-007 (session 005+)
 
 #### TASK-013: Make payments the source of truth for invoice status [`complete`] [`P1`] [`M`]
 **Dependencies:** none
@@ -434,6 +397,46 @@ _Tasks sketched; final decomposition at Milestone 7 plenary._
 - **Fast-tracked** per the user's "A" response on review option. Rationale: one-line port of a known-good pattern, full live round-trip verification, P0 blocker, director's grep audit confirmed no sibling bugs. No independent reviewer dispatch.
 - **Stale CLAUDE.md gotcha also applies to the PaymentMethod situation** — the current Gotchas list notes "Auto-backup code path is currently broken" (TASK-001 already fixed this). Separately, the PaymentMethod/values_callable trap is worth a new Gotcha line warning future developers. Flag for the stale-gotcha cleanup PR already logged in Discovered Work.
 - **PR #14** squash-merged as `673e4d0` on main.
+
+#### TASK-014: Replace `launch_url` with `FilePicker.save_file` for PDF download [`complete`] [`P1`] [`M`]
+**Status:** Attempted with FilePicker, reverted after web-mode testing revealed `FilePicker.save_file()` is a no-op in Flet web mode. Web-mode PDF/backup downloads work correctly via the original `page.launch_url()` approach, which was restored by the revert. Native Flet desktop on WSLg remains broken (original xdg_foreign limitation) and is deferred to host-side `wslu` setup — a platform limitation that cannot be fixed in Python code.
+
+**Dependencies:** none
+**Original description:** The user reported PDF download failing with `Gdk-WARNING: Server is missing xdg_foreign support` when running `mise run frontend` (native Flet desktop) on WSLg. TASK-014 was scoped to fix this by replacing `page.launch_url(pdf_url)` — which routes through GTK → Wayland portal → `xdg_foreign` — with `ft.FilePicker.save_file()` on the assumption that FilePicker would be platform-agnostic.
+
+**What actually happened (in order):**
+1. **PR #16 shipped the FilePicker approach** (2026-04-13). Three files changed: `invoices.py`, `settings.py`, `api_client.py`. Added `pdf_file_picker` and `backup_file_picker` in content Columns, rewrote `download_pdf` and `download_backup` to use `save_file()` with closure-based callbacks, added `get_backup_download()` to api_client. Reviewer (PR #16) approved with 5 minor findings. Fixup commit `a99a9b6` addressed findings #1, #2, #5. Findings #3 and #4 logged as Discovered Work.
+2. **Director's pre-merge verification was incomplete.** AST parsed, container restarted cleanly, `grep launch_url` showed zero residue. BUT no live button-click verification happened because the director can't click buttons in Flet without a human in the loop.
+3. **PR #16 merged.** User tested and reported: button click animation triggers but nothing happens — no dialog, no file, no error. Same behavior in both Flet web mode (localhost:8080) and native Flet desktop.
+4. **First recovery attempt — overlay hotfix.** Director initially diagnosed the bug as FilePicker placement (reviewer finding #4 revisited). Prepared a branch moving `pdf_file_picker` to `page.overlay`. Before applying it, went to verify against Flet source: found the FilePicker docstring explicitly describes it as using the "native file explorer", and `save_file()` in Flet 0.24 is just a state-setter on the Python side that calls `self.update()` — the actual dialog is rendered by the Flet CLIENT, which in web mode is Flutter-web-compiled and has NO implementation for native save dialogs (browsers cannot open native OS dialogs from JavaScript).
+5. **Correct diagnosis arrived.** `FilePicker.save_file()` is web-unsupported. The reviewer's finding #4 (about overlay placement) was irrelevant — the issue wasn't placement, it was that Flet web mode fundamentally does not support this API.
+6. **Second recovery — the actual fix.** Director reverted the two download handlers to `page.launch_url(url)`. Web mode works because the browser handles the `Content-Disposition: attachment` header and auto-downloads the file. Native Flet desktop on WSLg remains broken with the same xdg_foreign warning as before TASK-014 — nothing in the revert touches that platform limitation.
+7. **PR #18 shipped the revert** (`2f4ab90`). User confirmed web-mode PDF download works. PR #17 (the original TASK-014 bookkeeping, which claimed TASK-014 had shipped successfully) was closed without merging because its narrative was wrong.
+
+**Files changed on main (net result, post PR #16 + PR #18):**
+- `frontend/views/invoices.py` — one comment change to `download_pdf` documenting the web/native trade-off and pointing at PROJECT.md ADR #4 (web is canonical). Otherwise byte-identical to pre-TASK-014.
+- `frontend/views/settings.py` — byte-identical to pre-TASK-014.
+- `frontend/services/api_client.py` — byte-identical to pre-TASK-014.
+
+Net code change from TASK-014's exploration: **approximately 6 lines** (the clarifying comment). The 84-line FilePicker implementation was entirely transient.
+
+**Acceptance Criteria (final assessment):**
+- [x] PDF download works in the canonical web-mode run (http://localhost:8080) — user verified live
+- [ ] Native Flet desktop mode PDF download — **NOT fixed**. Original WSLg `xdg_foreign` limitation persists. Not a code bug; fix is host-side `wslu` setup (see CLAUDE.md follow-up Gotcha/Setup note).
+- [x] Backup download works in web mode (expected — same `launch_url` mechanism, not live-tested but infrastructure is identical)
+- [x] No regression in the canonical run mode
+- [x] Reviewer findings #1, #2, #5 (token guard, coupling anchor, filename accuracy) — all reverted along with the code they were fixing; no longer applicable.
+- [ ] Regression test — **not applicable**. The code that would have been tested no longer exists. If native-mode support is ever re-scoped (TASK-014b), add tests there.
+
+**Notes (post-mortem):**
+- **Discovered 2026-04-13** (session 004) when user first tried to download PDFs via native Flet desktop on WSLg. Workaround used during the session: curl directly against `http://127.0.0.1:8000/v1/invoices/{id}/pdf` from the host — works fine, files saved at `/home/horse/tax-billing-invoices/`.
+- **Lesson for the director:** when a task touches UI-visible behavior that only manifests at click time, **require a human-in-the-loop verification step in the acceptance criteria** before presenting the PR for merge. Static analysis, AST parse, and container restart caught nothing because the bug was Flet-web-runtime-specific. A 30-second "click the button and tell me what you see" check during TASK-014's dispatch would have surfaced the bug before PR #16 merged and prevented the revert cycle.
+- **Lesson for Flet web users:** `FilePicker.save_file()` is a no-op in Flet web mode. The FilePicker class description says "native file explorer" — take that literally. For file *downloads* in web mode, use `page.launch_url()` with a backend endpoint that returns `Content-Disposition: attachment`. Added as a Gotcha in CLAUDE.md by this PR.
+- **Native WSLg workaround:** install `wslu` on the host and export `BROWSER=wslview`, then `launch_url` in native Flet mode routes through `wslview` → Windows browser → download works. Added as a Setup/Gotcha note in CLAUDE.md by this PR. This is a one-time host setup and is explicitly out of scope for any Python code change.
+- **Reviewer findings #3 and #4 (logged as Discovered Work in PR #17):** both were about FilePicker code that no longer exists. Finding #3 (backend `pg_dump` orphan on save-dialog cancel) is moot because the eager-fetch pattern is gone. Finding #4 (FilePicker overlay migration) is moot because only the restore picker remains and it uses `pick_files()` (different dispatch). **Not migrating these to Discovered Work in this PR** — they're artifacts of the reverted code.
+- **PR #16** squash-merged as `379e6be` on main.
+- **PR #18** (the revert) squash-merged as `2f4ab90` on main.
+- **PR #17** (stale bookkeeping claiming TASK-014 shipped) closed without merging.
 
 ---
 

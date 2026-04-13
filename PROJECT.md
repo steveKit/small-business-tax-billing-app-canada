@@ -20,18 +20,25 @@ the first four Milestone 1 tasks: TASK-001 (auto-backup fix), TASK-002
 (credentials extracted to .env), TASK-004 (127.0.0.1 bind), TASK-005
 (utcnow deprecations). Session 004 (2026-04-13) landed TASK-013
 (invoice status bug — payments are source of truth; PR #10, `5a44a4e`),
-TASK-015 (per-client invoice numbering; PR #12, `bd38aed`), and
-TASK-016 (P0 hotfix — PaymentMethod enum serialization; latent bug
-surfaced on first real payment attempt post-TASK-013; PR #14,
-`673e4d0`). Four Milestone 1 tasks remain — TASK-014 (P1 — PDF download
-via FilePicker; discovered session 004), TASK-003 (strong secrets
-generation, user-gated data-loss event), TASK-006 (stale backup file
-cleanup, user-gated sudo), and TASK-007 (integration verification).
-Milestone 1 tag awaits TASK-007. **Payment creation is now unblocked**
-— user can record the real Adamson payments to close TASK-013's
-reconciliation loop through the normal UI flow. Recommended dispatch
-order for remaining M1 work: record real payments → TASK-014 →
-TASK-003 → TASK-006 → TASK-007.
+TASK-015 (per-client invoice numbering; PR #12, `bd38aed`), TASK-016
+(P0 hotfix — PaymentMethod enum serialization; latent bug surfaced on
+first real payment attempt post-TASK-013; PR #14, `673e4d0`), and
+**TASK-014 (resolved as reverted)** — FilePicker approach shipped in
+PR #16 then reverted in PR #18 (`2f4ab90`) after web-mode testing
+revealed `FilePicker.save_file()` is a no-op in Flet web. Web-mode PDF
+and backup downloads work via the pre-existing `launch_url` approach;
+native Flet desktop mode on WSLg remains broken (platform-level
+`xdg_foreign` limitation — host-side `wslu` setup is the workaround,
+now documented in CLAUDE.md § Gotchas). Three Milestone 1 tasks remain
+— TASK-003 (strong secrets generation, user-gated data-loss event),
+TASK-006 (stale backup file cleanup, user-gated elevated privileges),
+and TASK-007 (integration verification). Milestone 1 tag awaits
+TASK-007. **Payment creation is unblocked** (TASK-016) — user can
+record the real Adamson payments to close TASK-013's reconciliation
+loop through the normal UI flow. **Web-mode PDF/backup downloads are
+unblocked** (TASK-014 revert). Recommended dispatch order for
+remaining M1 work: record real payments → TASK-003 → TASK-006 →
+TASK-007.
 
 ## Architecture Decisions
 
@@ -102,7 +109,7 @@ Ontario provincial brackets) in `database/seed_data.sql`.
 | Milestone | Target | Status | Notes |
 |-----------|--------|--------|-------|
 | 0 — Workflow Scaffold | 2026-04-10 | `complete` | Tag: `milestone-00-workflow-scaffold` |
-| 1 — Stop the Bleeding | — | `in_progress` | 7/11 tasks shipped (PRs #4, #5, #10, #12, #14); TASK-014/003/006/007 pending; TASK-013/015/016 landed session 004; TASK-014 discovered session 004 |
+| 1 — Stop the Bleeding | — | `in_progress` | 8/11 tasks resolved (PRs #4, #5, #10, #12, #14, #16→#18 revert); TASK-003/006/007 pending; TASK-013/015/016 landed session 004; TASK-014 shipped then reverted session 004 (Flet web-mode FilePicker limitation) |
 | 2 — Quality Gates | — | `pending` | pyproject, ruff, mypy, pytest; TDD on tax_calculator; vertical slice |
 | 3 — Auth (L3) | — | `pending` | Single-user JWT auth, login, router decorator, harden restore endpoint |
 | 4 — Migrations | — | `pending` | Adopt Alembic, convert schema.sql, drop init-volume hack |
