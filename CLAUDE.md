@@ -27,7 +27,8 @@ Canonical [[wikilink]] targets for this project:
 - [[PROJECT]] — status, architecture decisions, milestones
 - [[TASKS]] — work queue with priorities and acceptance criteria
 - [[README]] — user-facing setup and usage
-- [[Handoffs/]] — session continuity directory (latest: [[Handoffs/handoff-004]])
+- [[Handoffs/]] — session continuity directory (latest: [[Handoffs/handoff-005]])
+- [[memory/MEMORY]] — stable operational/workflow patterns for this machine
 - `security-profile.yaml` — L3 profile for `/security-audit`
 
 ## Commands
