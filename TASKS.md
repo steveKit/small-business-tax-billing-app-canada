@@ -440,6 +440,34 @@ Net code change from TASK-014's exploration: **approximately 6 lines** (the clar
 
 ---
 
+### Ad-hoc fix — session 005
+
+**Completed:** 2026-06-10
+**PR:** #21 — `fix(invoice-pdf): preserve line breaks in Description of Work`
+
+#### TASK-017: Preserve line breaks in invoice PDF "Description of Work" [`complete`] [`P2`] [`S`]
+**Dependencies:** none (ad-hoc user-requested fix; never queued under a milestone)
+**Description:** User-entered newlines in an invoice's Description of Work were collapsed into single spaces in the rendered PDF. The fix preserves them with a one-line CSS addition (`white-space: pre-wrap;`) on the `.description-text` rule in the Jinja2 invoice template.
+
+**Files in scope (changed):**
+- `backend/app/templates/invoice.html` — added `white-space: pre-wrap;` to the `.description-text` CSS rule (one line).
+
+**Acceptance Criteria:**
+- [x] `.description-text` rule in `backend/app/templates/invoice.html` carries `white-space: pre-wrap;`
+- [x] Re-rendered invoice PDFs preserve user-entered line breaks in Description of Work
+- [x] No template injection risk introduced (Jinja2 `autoescape=True` retained; CSS approach, no `<br>` injection)
+- [x] No invoice recreation required — stored data was already correct; only PDF render output changed
+
+**Notes:**
+- **Root cause was render-only.** The input/storage side was already correct: the Flet field is `multiline=True` and the DB column is `Text`, so newlines were always stored. The `.description-text` CSS rule simply had no `white-space` property, so HTML collapsed the stored line breaks into single spaces at PDF render time.
+- **Injection-safe by design.** The Jinja2 template keeps `autoescape=True`, so a CSS-based fix was chosen over injecting `<br>` tags (which would have required either disabling autoescaping or a manual `nl2br`-style filter — both higher-risk for a template rendering client-supplied text).
+- **`pre-wrap` over `pre-line`.** `pre-wrap` preserves both newlines *and* runs of whitespace/indentation faithfully, which suits a pasted line-by-line work list where indentation may be meaningful. `pre-line` would have collapsed multiple spaces.
+- **No data migration / invoice recreation needed.** Because newlines were always stored, re-rendering the PDF reflects the fix. The backend bind-mounts the template (`./backend:/app`) and Jinja2 auto-reloads, so only a PDF re-download — or at most a `docker restart tax-billing-backend` — is required to pick up the change.
+- **Fast-tracked** (director self-review, no independent reviewer dispatch). Rationale: single-line CSS change, no API/schema/behavior change, no injection surface, 0 fix cycles.
+- **PR #21** squash-merged as `b5a211a` on main.
+
+---
+
 ## Discovered Work
 
 _Tasks found during implementation that weren't in the original plan. User decides when/whether to promote these to Active Tasks._
