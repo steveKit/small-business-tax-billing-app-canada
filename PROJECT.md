@@ -5,7 +5,7 @@ See [[CLAUDE]] for agent conventions and [[TASKS]] for the work queue.
 ## Status
 
 **Phase:** Hardening
-**Last Updated:** 2026-04-13
+**Last Updated:** 2026-06-10
 
 The project was built in Feb 2026 as a personal Canadian sole-proprietor
 tax-holdback calculator + invoicing tool. It functions but is unhardened:
@@ -40,6 +40,11 @@ unblocked** (TASK-014 revert). Recommended dispatch order for
 remaining M1 work: record real payments → TASK-003 → TASK-006 →
 TASK-007.
 
+Session 005 (2026-06-10) shipped one ad-hoc fix outside the milestone
+track: TASK-017 made the invoice PDF preserve user-entered line breaks
+in the "Description of Work" field (one-line CSS `white-space: pre-wrap;`
+in the WeasyPrint/Jinja2 template). Milestone 1 status is unchanged.
+
 ## Architecture Decisions
 
 | # | Decision | Choice | Rationale | Date |
@@ -53,6 +58,7 @@ TASK-007.
 | 7 | Tenancy model | Single-user (sole-prop) | The domain is one business owner. No multi-tenancy, no user registration, no role hierarchy. One admin user, one password. | 2026-04-10 |
 | 8 | Migration tooling | Alembic (deferred to Milestone 4) | Current compose init-volume approach forces `down -v` data loss on any schema change. Unacceptable for a tool holding real financial records. | 2026-04-10 |
 | 9 | Money handling | `Decimal` end to end | Floats are unacceptable for financial math. DB columns are `DECIMAL(12,2)`; Python quantizes to `Decimal("0.01")`. | 2026-04-10 (pre-existing, recorded) |
+| 10 | Architect pass | Declined for now | Case-(b) trigger (structural problems code can't fix) hasn't fired; 2026-04-10 foundation audit still valid; remaining M1 is mechanical/user-gated, M2 is pure tooling, and the architecturally-significant milestones (3/4/5/7) each get a focused plenary at their start. Revisit at the Milestone 3 auth plenary boundary if JWT bolts on awkwardly, or if any fix cycle stalls past ~3 iterations. | 2026-06-10 |
 
 ## External Integrations
 
