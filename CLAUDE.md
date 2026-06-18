@@ -25,7 +25,10 @@ tool. Single-tenant (one business owner, one user). **L3 security profile**
 Canonical [[wikilink]] targets for this project:
 - [[CLAUDE]] — this file (agent conventions, stack, commands)
 - [[PROJECT]] — status, architecture decisions, milestones
-- [[TASKS]] — work queue with priorities and acceptance criteria
+- [[TASKS]] — milestone index / dashboard
+- [[tasks/milestone-01-stop-the-bleeding]] — active milestone (current work queue)
+- [[tasks/deferred]] — task-level deferred / descoped log
+- [[tasks/discovered]] — discovered-work log
 - [[README]] — user-facing setup and usage
 - [[Handoffs/]] — session continuity directory (latest: [[Handoffs/handoff-005]])
 - [[memory/MEMORY]] — stable operational/workflow patterns for this machine
