@@ -119,4 +119,17 @@ secrets.*
 !secrets.example.*
 
 # Claude Code
+# .claude/settings.json IS committed (project-shared agent permissions).
+# The entries below are session machinery: today they exist only as sandbox
+# path-mask phantoms (char devices visible to sandboxed git status, absent
+# from the real filesystem); if any ever becomes real it is local-only state.
+# .mcp.json may carry MCP server env/credentials -- if a shareable MCP config
+# is ever wanted, commit a credential-free .mcp.json.example instead.
 .claude/worktrees/
+.claude/agents
+.claude/loop.md
+.claude/output-styles
+.claude/routines
+.claude/scheduled_tasks.json
+.claude/workflows
+.mcp.json

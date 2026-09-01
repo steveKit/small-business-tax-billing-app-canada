@@ -1,5 +1,7 @@
 # Gate Audit Report
 
+status: point-in-time (gate audit, 2026-09-01) — records the audit result at that date; superseded by later audits and by the gate configs themselves; do not update
+
 **Project**: tax-billing (`steveKit/small-business-tax-billing-app-canada`, public)
 **Surfaces**: Python (`backend/` — FastAPI), Python (`frontend/` — Flet; "frontend" is Python, not JS)
 **Shape**: code repo w/ PR flow (PRs #4–#25 on main; squash-merged)

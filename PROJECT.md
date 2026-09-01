@@ -91,20 +91,39 @@ DW-004, DW-008, DW-010 and DW-011 into the Milestone 2 task definitions.
 
 ## Architecture Decisions
 
-| # | Decision | Choice | Rationale | Date |
-|---|----------|--------|-----------|------|
-| 1 | Coding paradigm | Layered / service-oriented | Matches the existing `routers → services → models` shape; no refactor needed. FastAPI idiomatic. | 2026-04-10 |
-| 2 | Testing paradigm | Adaptive | TDD for pure tax math (high-stakes, clear contracts); test-after for routers/views/wiring. | 2026-04-10 |
-| 3 | Security profile | L3 | Handles PII + authoritative tax math + financial amounts; will eventually be network-exposed. "Harden this" is an explicit mandate from the user. | 2026-04-10 |
-| 4 | Canonical frontend run mode | Containerized Flet web (port 8080) | One code path to secure, works on any host, suits network exposure target. | 2026-04-10 |
-| 5 | Desktop-mode escape hatch | Kept as `mise run desktop` | Native window UX is pleasant for daily bookkeeping on WSL2/WSLg. Documented as non-canonical dev convenience. | 2026-04-10 |
-| 6 | Auth mechanism | JWT (Bearer in `Authorization` header) | Stateless, scriptable via `curl`, keeps `python-jose` non-cargo-culted. CSRF-exempt because not cookie-based. Details finalized at Milestone 3 plenary. | 2026-04-10 |
-| 7 | Tenancy model | Single-user (sole-prop) | The domain is one business owner. No multi-tenancy, no user registration, no role hierarchy. One admin user, one password. | 2026-04-10 |
-| 8 | Migration tooling | Alembic (deferred to Milestone 4) | Current compose init-volume approach forces `down -v` data loss on any schema change. Unacceptable for a tool holding real financial records. | 2026-04-10 |
-| 9 | Money handling | `Decimal` end to end | Floats are unacceptable for financial math. DB columns are `DECIMAL(12,2)`; Python quantizes to `Decimal("0.01")`. | 2026-04-10 (pre-existing, recorded) |
-| 10 | Architect pass | Declined for now | Case-(b) trigger (structural problems code can't fix) hasn't fired; 2026-04-10 foundation audit still valid; remaining M1 is mechanical/user-gated, M2 is pure tooling, and the architecturally-significant milestones (3/4/5/7) each get a focused plenary at their start. Revisit at the Milestone 3 auth plenary boundary if JWT bolts on awkwardly, or if any fix cycle stalls past ~3 iterations. | 2026-06-10 |
-| 11 | Dev DB host port | `127.0.0.1:5435` (registered) | Collided with `adamson-next-2025`, the registered owner of 5434 in the global port registry (`~/.claude/references/port-registry.yaml`). Per [[resource-naming]] § Ports Are Pinned Identities the unregistered party moves, and tax-billing's 5434 predated the registry. 5435 is the next free port in the postgres range 5433–5452; loopback-bound (`127.0.0.1:5435:5432`), and tax-billing now holds an `active` registry entry. Backend still reaches the DB at `db:5432` in-network, so only host-side connections moved. | 2026-09-01 |
-| 12 | Secrets rotation procedure | Non-destructive: `ALTER USER … PASSWORD` inside the running `tax-billing-db` container + `.env` edit (`POSTGRES_PASSWORD`, `DATABASE_URL`) + `docker compose up -d` to recreate the backend — never `docker compose down -v` | The `postgres_data` volume holds real financial records, and the `POSTGRES_*` env vars only take effect at *first* initialization — so recreating the volume to change a password trades real data for a rotation `ALTER USER` performs in place. Adopted when TASK-003 was deferred to M3; the task's original AC 3 (`down -v` rebuild) is dropped on pickup. | 2026-09-01 |
+| # | Decision | Choice | Rationale | Consequences | Date |
+|---|----------|--------|-----------|--------------|------|
+| 1 | Coding paradigm | Layered / service-oriented | Matches the existing `routers → services → models` shape; no refactor needed. FastAPI idiomatic. | — | 2026-04-10 |
+| 2 | Testing paradigm | Adaptive | TDD for pure tax math (high-stakes, clear contracts); test-after for routers/views/wiring. | — | 2026-04-10 |
+| 3 | Security profile | L3 | Handles PII + authoritative tax math + financial amounts; will eventually be network-exposed. "Harden this" is an explicit mandate from the user. | — | 2026-04-10 |
+| 4 | Canonical frontend run mode | Containerized Flet web (port 8080) | One code path to secure, works on any host, suits network exposure target. | — | 2026-04-10 |
+| 5 | Desktop-mode escape hatch | Kept as `mise run desktop` | Native window UX is pleasant for daily bookkeeping on WSL2/WSLg. Documented as non-canonical dev convenience. | — | 2026-04-10 |
+| 6 | Auth mechanism | JWT (Bearer in `Authorization` header) | Stateless, scriptable via `curl`, keeps `python-jose` non-cargo-culted. CSRF-exempt because not cookie-based. Details finalized at Milestone 3 plenary. | — | 2026-04-10 |
+| 7 | Tenancy model | Single-user (sole-prop) | The domain is one business owner. No multi-tenancy, no user registration, no role hierarchy. One admin user, one password. | — | 2026-04-10 |
+| 8 | Migration tooling | Alembic (deferred to Milestone 4) | Current compose init-volume approach forces `down -v` data loss on any schema change. Unacceptable for a tool holding real financial records. | — | 2026-04-10 |
+| 9 | Money handling | `Decimal` end to end | Floats are unacceptable for financial math. DB columns are `DECIMAL(12,2)`; Python quantizes to `Decimal("0.01")`. | — | 2026-04-10 (pre-existing, recorded) |
+| 10 | Architect pass | Declined for now | Case-(b) trigger (structural problems code can't fix) hasn't fired; 2026-04-10 foundation audit still valid; remaining M1 is mechanical/user-gated, M2 is pure tooling, and the architecturally-significant milestones (3/4/5/7) each get a focused plenary at their start. Revisit at the Milestone 3 auth plenary boundary if JWT bolts on awkwardly, or if any fix cycle stalls past ~3 iterations. | — | 2026-06-10 |
+| 11 | Dev DB host port | `127.0.0.1:5435` (registered) | Collided with `adamson-next-2025`, the registered owner of 5434 in the global port registry (`~/.claude/references/port-registry.yaml`). Per [[resource-naming]] § Ports Are Pinned Identities the unregistered party moves, and tax-billing's 5434 predated the registry. 5435 is the next free port in the postgres range 5433–5452; loopback-bound (`127.0.0.1:5435:5432`), and tax-billing now holds an `active` registry entry. Backend still reaches the DB at `db:5432` in-network, so only host-side connections moved. | — | 2026-09-01 |
+| 12 | Secrets rotation procedure | Non-destructive: `ALTER USER … PASSWORD` inside the running `tax-billing-db` container + `.env` edit (`POSTGRES_PASSWORD`, `DATABASE_URL`) + `docker compose up -d` to recreate the backend — never `docker compose down -v` | The `postgres_data` volume holds real financial records, and the `POSTGRES_*` env vars only take effect at *first* initialization — so recreating the volume to change a password trades real data for a rotation `ALTER USER` performs in place. Adopted when TASK-003 was deferred to M3; the task's original AC 3 (`down -v` rebuild) is dropped on pickup. | — | 2026-09-01 |
+
+_Add rows as decisions are made. Don't delete — this is the project's decision
+history. A reversal is a new row; mark the old row's Choice `superseded by #N`,
+never rewrite it. **Rationale** says why the choice won; **Consequences** says
+what it makes easier and what it makes harder — the warning to the future
+reader (`—` only when genuinely trivial). A decision with an expiry condition
+records it in its Consequences cell as `Revisit when: <observable trigger>`;
+the planner checks for fired triggers at every milestone explosion. A decision
+**graduates** to a point-in-time doc under `docs/` (linked from the Rationale
+cell — the row stays the index) when any criterion holds: real alternatives
+were seriously weighed, the decision introduces a novel pattern, or it cuts
+across features. The graduated doc follows Nygard's shape — Context, Decision,
+Consequences, Alternatives considered, optional Revisit when._
+
+_When descriptive architecture content outgrows this file (sections needing
+subsections, agents needing repeated deep-dives), the documenter graduates the
+descriptive bulk to `docs/architecture.md` from
+`~/.claude/templates/architecture-md.md` and leaves a pointer here. This table
+and § Runtime Data Flow never move — they are operational instruments._
 
 ## External Integrations
 
