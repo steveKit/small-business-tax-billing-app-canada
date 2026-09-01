@@ -79,6 +79,10 @@ cd frontend && python main.py
 - **Backend API**: http://localhost:8000
 - **API Documentation**: http://localhost:8000/docs
 
+> **Loopback only.** Every published port is bound to `127.0.0.1`, so the API
+> and the web UI are reachable from this machine only — not from the LAN. The
+> API has no authentication yet; leave the bindings alone until it does.
+
 ### 4. Initial Setup
 
 1. Go to **Settings** in the frontend
@@ -217,13 +221,17 @@ Backups use PostgreSQL's native `pg_dump` format for complete database portabili
 4. ⚠️ This will **replace all current data** with the backup
 
 ### Manual Backup via CLI
+
+Substitute the `POSTGRES_USER` and `POSTGRES_DB` values from your `.env` —
+they are no longer hardcoded anywhere in the project.
+
 ```bash
-docker compose exec db pg_dump -U postgres -d tax_billing > backup.sql
+docker compose exec db pg_dump -U <POSTGRES_USER> -d <POSTGRES_DB> > backup.sql
 ```
 
 ### Manual Restore via CLI
 ```bash
-docker compose exec -T db psql -U postgres -d tax_billing < backup.sql
+docker compose exec -T db psql -U <POSTGRES_USER> -d <POSTGRES_DB> < backup.sql
 ```
 
 ## Development

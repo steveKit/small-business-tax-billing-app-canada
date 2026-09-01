@@ -45,7 +45,7 @@ _None — milestone closed 2026-09-01._
 - [x] `create_backup` is async and accepts `backup_type: Literal["auto", "manual"]`
 - [x] `backup_logs` table is actually written to (was orphaned — ORM model existed but nothing wrote to it)
 - [ ] Regression test: creating a client triggers a successful auto-backup without exception — **deferred to Milestone 2** (no test infra yet; TASK-007 integration covers manual verification)
-- [ ] Manual QA: POST a client via `curl`, verify no 500 — **deferred to TASK-007**
+- [x] Manual QA: POST a client via `curl`, verify no 500 — **closed by TASK-007 (2026-09-01)** via real usage: clients/invoices/payments created through the UI since the fix with 0 5xx in the backend log; today's payment create ran the auto-backup path clean (file + `backup_logs` row)
 **Discovered during this task:** DW-001, DW-002
 **Notes:**
 - Dispatched in standard mode (not TDD) because the fix was a refactor-to-match-callers, not behavior-spec-first.
@@ -65,7 +65,7 @@ _None — milestone closed 2026-09-01._
 - [x] `backend/app/config.py` has no default values containing real-looking credentials; pydantic-settings now fails fast at startup if `DATABASE_URL` or `JWT_SECRET_KEY` missing
 - [x] `.env.example` documents every new variable with a comment and a placeholder; includes prominent pointer to `python -c "import secrets; print(secrets.token_urlsafe(32))"`
 - [x] README updated: "Copy `.env.example` to `.env` and generate real values" step is explicit
-- [ ] `docker compose up` still works with a fresh `.env` file — **deferred to TASK-007**
+- [x] `docker compose up` still works with a fresh `.env` file — **closed by TASK-007 (2026-09-01)**: the stack was recreated today (`docker compose up -d db backend`, healthy) from the user's `.env` under the fail-fast `config.py`, and a throwaway init container with explicit `POSTGRES_*` values built the schema from scratch
 **Discovered during this task:** DW-003, DW-004, DW-005
 **Notes:**
 - Healthcheck updated to `pg_isready -U ${POSTGRES_USER}` so it tracks whatever user the operator configures.
@@ -84,7 +84,7 @@ _None — milestone closed 2026-09-01._
 - [x] `frontend` port mapping is `127.0.0.1:8080:8080`
 - [x] `db` port mapping is `127.0.0.1:5433:5432`
 - [x] Comment in compose file: `# Bound to 127.0.0.1 until auth lands (Milestone 3). See TASKS.md TASK-004.`
-- [ ] `curl http://127.0.0.1:8000/health` works; `curl http://<LAN-IP>:8000/health` does not — **deferred to TASK-007**
+- [x] `curl http://127.0.0.1:8000/health` works; `curl http://<LAN-IP>:8000/health` does not — **closed by TASK-007 (2026-09-01)**: loopback → 200; WSL LAN IP on 8000, 5435 and 8080 → connection refused
 **Notes:**
 - Bundled into PR #5 with TASK-002 because both touched `docker-compose.yml`.
 
@@ -257,6 +257,9 @@ Net code change from TASK-014's exploration: **approximately 6 lines** (the clar
 - [x] `backups/` is empty of stale artifacts — 8 `.json` removed; 12 `.sql` auto-backups (Apr 13 → Sep 1) retained
 - [x] A note in CLAUDE.md § Gotchas about the `root`-ownership footgun (already present — verified; its "TASK-006 will clean up" clause trimmed at bookkeeping)
 **Notes:**
+- **Removed 8 dead `.json` backups**, all dated 2026-02-09 — the file format of the pre-TASK-001 backup implementation, which the current restore path cannot read. The 12 `.sql` auto/manual backups were retained (Apr 13 ×7, May 13 ×2, Jun 10, Jun 18, Sep 1).
+- **No host `sudo` needed — delete root-owned files from inside the container.** `backups/` is bind-mounted at `/app/backups` in `tax-billing-backend`, which runs as root, so `docker exec tax-billing-backend sh -c 'rm -f /app/backups/*.json'` removes them cleanly. This was the task's original plan and it stands as the reusable pattern for anything the backend wrote as root across that bind mount; recorded in [[CLAUDE]] § Gotchas.
+- **Repo untouched** — `backups/` is gitignored, so this was purely operational: no code change, no PR, no review, 0 fix cycles. Director-executed, no implementer dispatch.
 
 #### TASK-007: Integration — Milestone 1 verification [`complete`] [`P0`] [`S`]
 **Dependencies:** TASK-001, TASK-002, TASK-004, TASK-005, TASK-006, TASK-013, TASK-015, TASK-016 (TASK-003 deferred → M3; dependency dropped 2026-09-01)
@@ -271,12 +274,20 @@ Net code change from TASK-014's exploration: **approximately 6 lines** (the clar
 - [x] Grep for hardcoded secrets / deprecations — zero matches in code/config (only the `.env.example` placeholder, which the criterion excludes, and historical mentions in PROJECT.md / Handoffs / this file)
 - [x] Milestone 1 tag created: `milestone-01-stop-the-bleeding`
 **Notes:**
+- **The fresh-rebuild criterion was verified without wiping the real volume.** `docker compose down -v` would have destroyed live financial records, so the director rebuilt the *schema* instead: a throwaway `postgres:16-alpine` (`--name tax-billing-schema-verify`, no volume, no published port, removed afterwards) with `database/schema.sql` and `database/seed_data.sql` mounted at `/docker-entrypoint-initdb.d/` exactly as compose mounts them. Result: 9 tables, 2 views, 5 federal + 5 Ontario brackets for each of 2025 and 2026, and `tax_years` rows for 2025/2026 at $80,000 presumed income. The one `FATAL: database "tax_billing" does not exist` line in its init log was the director's own `pg_isready` probe hitting the entrypoint's init-time temp server — standard postgres noise, not a schema failure. The `postgres_data` volume was never touched. The criterion's "with new `.env`" clause travels with TASK-003 (deferred → M3).
+- **Real usage was better evidence than a synthetic smoke run.** The API has no `DELETE /v1/invoices` (clients are soft-delete only), so a create→delete cycle would have left a permanent test invoice in real books — session 004 already had to `psql` such rows back out. The accepted evidence is instead today's actual web-mode session: dashboard load, `POST /v1/payments` → 201, the resulting auto-backup file `2026-09-01T14-55-02.sql` with its matching `backup_logs` row, plus clients and invoices created through the UI across sessions since 2026-04-13 — 0 tracebacks and 0 5xx in today's log window.
+- **Regression probes were built to be non-destructive.** The TASK-013 guard was proven against a *random* UUID so no real row could be touched: `status: paid` → 422 from the pydantic `Literal`, and `status: pending` on the same UUID → 404, which proves the body passed validation and the handler actually ran. Payment-driven `PAID` is confirmed by live data (Adamson-003/004, BEE-002). TASK-015 numbering holds in production data (`2026-Adamson-001`…`005`, `2026-BEE-001`…`003`); TASK-016 holds via today's 201 with `cheque` ×5 and `e_transfer` ×2 in use. The secrets/`utcnow` grep returned zero matches in code and config — only the `.env.example` placeholder and historical mentions in docs.
+- **Lesson — time-bound `docker logs` before reading a long-lived container's log as "current".** `tax-billing-backend` was *created* 2026-04-13 and only *started* today, so its log spans five months. An `invalid input value for enum payment_method: "E_TRANSFER"` traceback sitting in it reads like a live TASK-016 regression but is April's pre-fix error; `values_callable` is present in `backend/app/models/payment.py` and the `--since 2026-09-01` window is clean. Always window the log first.
+- **Wiring audit: nothing Milestone 1 introduced is orphaned.** `ALLOWED_STATUS_TRANSITIONS` (TASK-013) and `_slug_client_name` (TASK-015) are both referenced at their call sites. The audit did surface 5 **pre-existing** unreferenced pydantic schemas — logged as DW-012 in [[tasks/discovered]], not an M1 regression.
+- **`backup_logs` and disk disagree** — 21 rows (16 auto, 5 manual) against 12 `.sql` files on disk, and `backup_retention_count` (30) is never applied: no pruning, no reconciliation, so rows can reference vanished files. Logged as DW-013 for M6 hardening alongside DW-002.
+- **TASK-003 dropped from the dependency list** rather than blocking the milestone — deferred to M3 by user decision the same day (see § Deferred Tasks and [[tasks/deferred]] DEF-001).
+- Director-executed verification: no implementer and no reviewer dispatch (nothing to review — zero code change), 0 fix cycles. Annotated tag `milestone-01-stop-the-bleeding` created at `7d42dcb` and pushed.
 
 ---
 
 ## Out-of-milestone / ad-hoc completed work
 
-_Ad-hoc items landed during the M1 window (sessions 005–006); never part of M1 scope — excluded from the 8/11 milestone count._
+_Ad-hoc items landed during the M1 window (sessions 005–006); never part of M1 scope — excluded from the final 10/11 milestone count._
 
 ### Ad-hoc fix — session 005
 

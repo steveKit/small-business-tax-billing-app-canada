@@ -4,15 +4,19 @@ See [[CLAUDE]] for agent conventions and [[TASKS]] for the work queue.
 
 ## Status
 
-**Phase:** Hardening
+**Phase:** Hardening — Milestone 1 closed, entering Milestone 2 (Quality Gates)
 **Last Updated:** 2026-09-01
 
 The project was built in Feb 2026 as a personal Canadian sole-proprietor
-tax-holdback calculator + invoicing tool. It functions but is unhardened:
+tax-holdback calculator + invoicing tool. It functioned but was unhardened:
 no auth, no tests, no lint/type-check, hardcoded credentials in committed
 files, a broken auto-backup code path, and an unauthenticated SQL restore
 endpoint. A workflow plenary was held on 2026-04-10 and the project is
-now being hardened to L3 for eventual network exposure.
+being hardened to L3 for eventual network exposure. Milestone 1 closed the
+worst of that list — credentials extracted to `.env`, the auto-backup path
+fixed, every published port bound to loopback — leaving no auth, no tests,
+no lint/type-check, and the unauthenticated SQL restore endpoint as the
+remaining unhardened surface (Milestones 2 and 3).
 
 **Milestone 0 (Workflow Scaffold) is complete** as of 2026-04-10 —
 tagged `milestone-00-workflow-scaffold`. Session 003 (2026-04-10) landed
@@ -29,16 +33,10 @@ revealed `FilePicker.save_file()` is a no-op in Flet web. Web-mode PDF
 and backup downloads work via the pre-existing `launch_url` approach;
 native Flet desktop mode on WSLg remains broken (platform-level
 `xdg_foreign` limitation — host-side `wslu` setup is the workaround,
-now documented in CLAUDE.md § Gotchas). Three Milestone 1 tasks remain
-— TASK-003 (strong secrets generation, user-gated data-loss event),
-TASK-006 (stale backup file cleanup, user-gated elevated privileges),
-and TASK-007 (integration verification). Milestone 1 tag awaits
-TASK-007. **Payment creation is unblocked** (TASK-016) — user can
-record the real Adamson payments to close TASK-013's reconciliation
-loop through the normal UI flow. **Web-mode PDF/backup downloads are
-unblocked** (TASK-014 revert). Recommended dispatch order for
-remaining M1 work: record real payments → TASK-003 → TASK-006 →
-TASK-007.
+now documented in CLAUDE.md § Gotchas). That session also unblocked
+**payment creation** (TASK-016) and **web-mode PDF/backup downloads**
+(TASK-014 revert), leaving TASK-003, TASK-006 and TASK-007 as the last
+Milestone 1 work.
 
 Session 005 (2026-06-10) shipped one ad-hoc fix outside the milestone
 track: TASK-017 made the invoice PDF preserve user-entered line breaks
@@ -60,9 +58,36 @@ written and no note here — [[TASKS]] is now an index over
 out of band**: `2026-Adamson-001` and `-002` are both `paid`, which closes
 the P0 reconciliation blocker carried since handoff-005. Newer invoices
 exist (Adamson-003/004/005, BEE-002/003) and `backups/` holds `.sql`
-auto-backups dated 2026-05-13. Milestone 1 is otherwise unchanged: three
-tasks remain, all user-gated — recommended order TASK-003 (strong secrets)
-→ TASK-006 (stale backup cleanup) → TASK-007 (integration verification).
+auto-backups dated 2026-05-13. Milestone 1's three remaining tasks were
+all user-gated at that point; they were resolved later the same day in the
+close-out below.
+
+**Milestone 1 — Stop the Bleeding — closed 2026-09-01**, annotated tag
+`milestone-01-stop-the-bleeding` at `7d42dcb`. Final tally: 10 of 11 tasks
+complete, with **TASK-003 (strong secrets) deferred to Milestone 3** by user
+decision and re-scoped there to a non-destructive rotation (ADR #12;
+[[tasks/deferred]] DEF-001) — the volume holds real financial records and the
+original plan required `docker compose down -v`. The close-out ran TASK-006
+(8 dead `.json` backups from the pre-TASK-001 format removed from the
+root-owned `backups/` bind mount via `docker exec`, no host `sudo`) and
+TASK-007, the integration verification. TASK-007 was deliberately built to
+avoid destroying real data: the schema was rebuilt from `schema.sql` +
+`seed_data.sql` inside a **throwaway** `postgres:16-alpine` container instead
+of wiping `postgres_data` (9 tables, 2 views, 2025/2026 federal + Ontario
+brackets, `tax_years` seeded), `/health` returned 200, the hardcoded-secrets
+and `utcnow` greps came back clean, and the TASK-013/015/016 regressions were
+confirmed from live production data plus a random-UUID PATCH probe rather
+than a synthetic create/delete cycle that would have left test invoices in
+real books. The wiring audit found nothing Milestone 1 introduced to be
+orphaned; it did surface two **pre-existing** issues, logged as DW-012
+(unreferenced pydantic schemas) and DW-013 (`backup_logs` rows outnumber
+backup files on disk; `backup_retention_count` is never applied). Neither
+task changed code, so there were no PRs in this close-out — bookkeeping went
+direct to main (`1a4000e`, `7d42dcb`). The discovered-work log was triaged
+with the user in full: every open item now carries a target milestone (see
+[[tasks/discovered]]). **Next up: Milestone 02 — Quality Gates**, starting
+with TASK-008 (pyproject + ruff). At M2 start the director folds DW-003,
+DW-004, DW-008, DW-010 and DW-011 into the Milestone 2 task definitions.
 
 ## Architecture Decisions
 
@@ -79,6 +104,7 @@ tasks remain, all user-gated — recommended order TASK-003 (strong secrets)
 | 9 | Money handling | `Decimal` end to end | Floats are unacceptable for financial math. DB columns are `DECIMAL(12,2)`; Python quantizes to `Decimal("0.01")`. | 2026-04-10 (pre-existing, recorded) |
 | 10 | Architect pass | Declined for now | Case-(b) trigger (structural problems code can't fix) hasn't fired; 2026-04-10 foundation audit still valid; remaining M1 is mechanical/user-gated, M2 is pure tooling, and the architecturally-significant milestones (3/4/5/7) each get a focused plenary at their start. Revisit at the Milestone 3 auth plenary boundary if JWT bolts on awkwardly, or if any fix cycle stalls past ~3 iterations. | 2026-06-10 |
 | 11 | Dev DB host port | `127.0.0.1:5435` (registered) | Collided with `adamson-next-2025`, the registered owner of 5434 in the global port registry (`~/.claude/references/port-registry.yaml`). Per [[resource-naming]] § Ports Are Pinned Identities the unregistered party moves, and tax-billing's 5434 predated the registry. 5435 is the next free port in the postgres range 5433–5452; loopback-bound (`127.0.0.1:5435:5432`), and tax-billing now holds an `active` registry entry. Backend still reaches the DB at `db:5432` in-network, so only host-side connections moved. | 2026-09-01 |
+| 12 | Secrets rotation procedure | Non-destructive: `ALTER USER … PASSWORD` inside the running `tax-billing-db` container + `.env` edit (`POSTGRES_PASSWORD`, `DATABASE_URL`) + `docker compose up -d` to recreate the backend — never `docker compose down -v` | The `postgres_data` volume holds real financial records, and the `POSTGRES_*` env vars only take effect at *first* initialization — so recreating the volume to change a password trades real data for a rotation `ALTER USER` performs in place. Adopted when TASK-003 was deferred to M3; the task's original AC 3 (`down -v` rebuild) is dropped on pickup. | 2026-09-01 |
 
 ## External Integrations
 
@@ -160,7 +186,7 @@ Ontario provincial brackets) in `database/seed_data.sql`.
 | Milestone | Target | Status | Notes |
 |-----------|--------|--------|-------|
 | 0 — Workflow Scaffold | 2026-04-10 | `complete` | Tag: `milestone-00-workflow-scaffold` |
-| 1 — Stop the Bleeding | — | `active` | 8/11 tasks resolved (PRs #4, #5, #10, #12, #14, #16→#18 revert); TASK-003/006/007 pending; TASK-013/015/016 landed session 004; TASK-014 shipped then reverted session 004 (Flet web-mode FilePicker limitation) + ad-hoc TASK-017/018 (excluded from count) |
+| 1 — Stop the Bleeding | 2026-09-01 | `complete` | Tag: `milestone-01-stop-the-bleeding` — 10/11 complete, TASK-003 deferred → M3; + ad-hoc TASK-017/018 |
 | 2 — Quality Gates | — | `active` | Decomposed, not started (see [[tasks/milestone-02-quality-gates]]): pyproject, ruff, mypy, pytest; TDD on tax_calculator; vertical slice |
 | 3 — Auth (L3) | — | `pending` | Single-user JWT auth, login, router decorator, harden restore endpoint |
 | 4 — Migrations | — | `pending` | Adopt Alembic, convert schema.sql, drop init-volume hack |
