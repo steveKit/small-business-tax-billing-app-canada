@@ -1,13 +1,17 @@
 # Milestone 01: Stop the Bleeding
 
-> **Status:** active
+> **Status:** complete · **Completed:** 2026-09-01 · **Tag:** milestone-01-stop-the-bleeding
 > Index: [[TASKS]] · Architecture: [[PROJECT]] · Conventions: [[CLAUDE]]
 > **Goal:** The P0 fixes that make the codebase safe to work on. Every task in this milestone addresses a latent bug, a security rule violation, or a footgun discovered in the plenary audit.
 > **Priority:** `P0` (critical) | `P1` (high) | `P2` (medium) | `P3` (low) · **Size:** `S` (< 1 hr) | `M` (1–4 hrs) | `L` (4+ hrs)
 
 ## Active Tasks
 
-### TASK-003: Generate strong secrets in .env [`pending`] [`P0`] [`S`]
+_None — milestone closed 2026-09-01._
+
+## Deferred Tasks (this milestone)
+
+### TASK-003: Generate strong secrets in .env [`pending`] [`P0`] [`S`] — deferred 2026-09-01 → Milestone 03 (Auth)
 **Dependencies:** TASK-002
 **Description:** Populate the local `.env` with strong random values for `POSTGRES_PASSWORD` and `JWT_SECRET_KEY`. Document the generation command in `.env.example` comments. This is local-only work — director will not touch the user's `.env`; the user will follow a command the task provides.
 **Acceptance Criteria:**
@@ -16,21 +20,7 @@
 - [ ] `docker compose down -v && docker compose up -d` rebuilds the DB container with the new password
 **Notes:**
 - **Data loss event.** Because this wipes the `postgres_data` volume, user should export current data first if they've been using the tool. Director flags this in the task dispatch.
-
----
-
-### TASK-007: Integration — Milestone 1 verification [`in_progress`] [`P0`] [`S`]
-**Dependencies:** TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-013, TASK-015, TASK-016
-**Description:** End-to-end verification that Milestone 1 left the tool in a working state. Wiring audit per plenary checklist; ensures no orphaned new modules.
-**Acceptance Criteria:**
-- [ ] `docker compose down -v && docker compose up -d` rebuilds cleanly with new `.env`
-- [ ] Backend `/health` returns 200 from `127.0.0.1`
-- [ ] Frontend (host-mode `mise run desktop` for now) can load dashboard, create client, create invoice, record payment without crashing the auto-backup path
-- [ ] Invoice status flow smoke-tested: direct PATCH to `PAID` rejected; payment-driven transition to `PAID` still works (TASK-013 regression check)
-- [ ] Invoice numbering smoke-tested: new invoice for Adamson lands as `2026-Adamson-NNN`; new invoice for BEE lands as `2026-BEE-NNN`; existing 3 rows migrated (TASK-015 regression check)
-- [ ] Payment creation smoke-tested: `POST /v1/payments` with a live `payment_method` value returns 201 (TASK-016 regression check)
-- [ ] Grep for any remaining hardcoded secrets / deprecations — all zero matches (excluding `.env.example` and `.git/`): `grep -rn --exclude=.env.example --exclude-dir=.git -E "postgres:postgres|change-this-secret|your-secret-key|utcnow" .`
-- [ ] Milestone 1 tag created: `milestone-01-stop-the-bleeding`
+- **Deferred 2026-09-01 (user decision, session 006) → M3.** Both ports are loopback-bound and `JWT_SECRET_KEY` is unused until M3 auth, so rotation is not urgent for a local-only tool. When picked up, **re-scope to the non-destructive procedure**: `ALTER USER … PASSWORD` inside the running `tax-billing-db` container + `.env` edit (`POSTGRES_PASSWORD`, `DATABASE_URL`) + `docker compose up -d` to recreate the backend — no `down -v`, no data loss. Drop AC 3 accordingly. Row recorded in [[tasks/deferred]].
 
 ---
 
@@ -266,6 +256,20 @@ Net code change from TASK-014's exploration: **approximately 6 lines** (the clar
 **Acceptance Criteria:**
 - [x] `backups/` is empty of stale artifacts — 8 `.json` removed; 12 `.sql` auto-backups (Apr 13 → Sep 1) retained
 - [x] A note in CLAUDE.md § Gotchas about the `root`-ownership footgun (already present — verified; its "TASK-006 will clean up" clause trimmed at bookkeeping)
+**Notes:**
+
+#### TASK-007: Integration — Milestone 1 verification [`complete`] [`P0`] [`S`]
+**Dependencies:** TASK-001, TASK-002, TASK-004, TASK-005, TASK-006, TASK-013, TASK-015, TASK-016 (TASK-003 deferred → M3; dependency dropped 2026-09-01)
+**Description:** End-to-end verification that Milestone 1 left the tool in a working state. Wiring audit per plenary checklist; ensures no orphaned new modules.
+**Acceptance Criteria:**
+- [x] `docker compose down -v && docker compose up -d` rebuilds cleanly — **verified non-destructively**: a throwaway `postgres:16-alpine` container with `schema.sql` + `seed_data.sql` mounted as compose does initialized 9 tables, 2 views, 2025/2026 federal + ON brackets, `tax_years`; the real `postgres_data` volume was not wiped. "With new `.env`" clause rides with TASK-003 (deferred → M3)
+- [x] Backend `/health` returns 200 from `127.0.0.1`
+- [x] Frontend can load dashboard, create client, create invoice, record payment without crashing the auto-backup path — real-usage evidence (web mode): today's session loaded the dashboard and recorded a payment (`POST /v1/payments` 201) that produced an auto-backup file and `backup_logs` row; invoices/clients created by the user across sessions since 2026-04-13 with 0 tracebacks / 0 5xx in the backend log. Synthetic create/delete cycle deliberately skipped — no `DELETE /v1/invoices`, would leave a test invoice in real books
+- [x] Invoice status flow: direct PATCH to `PAID` rejected (422 from the `Literal` schema guard, proven against a random UUID so no real row could be touched); payment-driven transition to `PAID` confirmed by Adamson-003/004 and BEE-002 (TASK-013 regression check)
+- [x] Invoice numbering: real data shows `2026-Adamson-001`…`005` and `2026-BEE-001`…`003`; the 3 migrated rows are Adamson-001/002 + BEE-001 (TASK-015 regression check)
+- [x] Payment creation: `POST /v1/payments` 201 today with a live `payment_method`; methods in use `cheque` ×5, `e_transfer` ×2 (TASK-016 regression check)
+- [x] Grep for hardcoded secrets / deprecations — zero matches in code/config (only the `.env.example` placeholder, which the criterion excludes, and historical mentions in PROJECT.md / Handoffs / this file)
+- [x] Milestone 1 tag created: `milestone-01-stop-the-bleeding`
 **Notes:**
 
 ---

@@ -18,7 +18,6 @@
 
 | Milestone | Status | Progress | File |
 |-----------|--------|----------|------|
-| Milestone 01: Stop the Bleeding | `active` | 8/11 tasks | [[tasks/milestone-01-stop-the-bleeding]] |
 | Milestone 02: Quality Gates | `active` | 0/5 tasks (decomposed, not started) | [[tasks/milestone-02-quality-gates]] |
 
 _The milestone file is the source of truth for per-task status. The Progress
@@ -48,6 +47,7 @@ _None._
 | Milestone | Completed | Tag | File |
 |-----------|-----------|-----|------|
 | Milestone 00: Workflow Scaffold | 2026-04-10 | `milestone-00-workflow-scaffold` | [[tasks/milestone-00-workflow-scaffold]] |
+| Milestone 01: Stop the Bleeding | 2026-09-01 | `milestone-01-stop-the-bleeding` | [[tasks/milestone-01-stop-the-bleeding]] — 10/11 complete, TASK-003 deferred → M03 |
 
 ## Logs
 
