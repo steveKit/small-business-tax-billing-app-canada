@@ -47,23 +47,6 @@
 
 ---
 
-### TASK-018: Reallocate db host port 5434 → 5435 (port-registry collision) [`in_progress`] [`P0`] [`S`]
-**Dependencies:** none (ad-hoc chore; blocks all DB-dependent M1 work this session)
-**Description:** `docker compose up` fails with `Bind for 127.0.0.1:5434 failed: port is already allocated` — `adamson-next-2025-postgres-dev` holds 5434 and is the registered owner in the global port registry (`~/.claude/references/port-registry.yaml`). tax-billing predates the registry and was never registered, so it is the unregistered party. Per [[resource-naming]] § Ports Are Pinned Identities, reallocate to the next free port in the postgres range (5433–5452 → 5435), register it, and mirror the allocation into project docs. Backend talks to `db:5432` inside the compose network, so only host-side connections move.
-**Design / placement:** existing config — one-line host-port change in `docker-compose.yml`; no structural change.
-**Files in scope:**
-- `docker-compose.yml` (host port line)
-- `~/.claude/references/port-registry.yaml` (director appends the allocation entry)
-- `CLAUDE.md` § Gotchas, `PROJECT.md` (documenter, at bookkeeping)
-**Acceptance Criteria:**
-- [ ] `docker-compose.yml` publishes the db on `127.0.0.1:5435:5432`; no other file references 5434 except historical notes
-- [ ] `docker compose up -d db backend` succeeds and `tax-billing-db` reports healthy
-- [ ] tax-billing has an `active` postgres entry on 5435 in the global port registry
-- [ ] CLAUDE.md § Gotchas port note updated (5433 → 5434 → 5435 history preserved); PROJECT.md records the allocation
-**Notes:**
-
----
-
 ## Completed Tasks (this milestone)
 
 ### Milestone 1: Stop the Bleeding (partial — session 003)
@@ -287,7 +270,7 @@ Net code change from TASK-014's exploration: **approximately 6 lines** (the clar
 
 ## Out-of-milestone / ad-hoc completed work
 
-_Ad-hoc fix landed during the M1 window (session 005); never part of M1 scope — excluded from the 8/11 milestone count._
+_Ad-hoc items landed during the M1 window (sessions 005–006); never part of M1 scope — excluded from the 8/11 milestone count._
 
 ### Ad-hoc fix — session 005
 
@@ -314,3 +297,23 @@ _Ad-hoc fix landed during the M1 window (session 005); never part of M1 scope �
 - **No data migration / invoice recreation needed.** Because newlines were always stored, re-rendering the PDF reflects the fix. The backend bind-mounts the template (`./backend:/app`) and Jinja2 auto-reloads, so only a PDF re-download — or at most a `docker restart tax-billing-backend` — is required to pick up the change.
 - **Fast-tracked** (director self-review, no independent reviewer dispatch). Rationale: single-line CSS change, no API/schema/behavior change, no injection surface, 0 fix cycles.
 - **PR #21** squash-merged as `b5a211a` on main.
+
+### Ad-hoc chore — session 006
+
+**Completed:** 2026-09-01
+**PR:** #25 — `chore(compose): reallocate db host port 5434 → 5435 (TASK-018)`
+
+#### TASK-018: Reallocate db host port 5434 → 5435 (port-registry collision) [`complete`] [`P0`] [`S`]
+**Dependencies:** none (ad-hoc chore; blocked all DB-dependent M1 work this session)
+**Description:** `docker compose up` failed with `Bind for 127.0.0.1:5434 failed: port is already allocated` — `adamson-next-2025-postgres-dev` holds 5434 and is the registered owner in the global port registry (`~/.claude/references/port-registry.yaml`). tax-billing predates the registry and was never registered, so it was the unregistered party. Per [[resource-naming]] § Ports Are Pinned Identities, reallocated to the next free port in the postgres range (5433–5452 → 5435), registered it, and mirrored the allocation into project docs. Backend talks to `db:5432` inside the compose network, so only host-side connections moved.
+**Design / placement:** existing config — one-line host-port change in `docker-compose.yml`; no structural change.
+**Files in scope (changed):**
+- `docker-compose.yml` — db service host port `127.0.0.1:5434:5432` → `127.0.0.1:5435:5432`
+- `~/.claude/references/port-registry.yaml` — tax-billing postgres allocation appended (director; global config repo, outside this project)
+- `CLAUDE.md` § Gotchas, `PROJECT.md` — updated at bookkeeping (documenter)
+**Acceptance Criteria:**
+- [x] `docker-compose.yml` publishes the db on `127.0.0.1:5435:5432`; no other file references 5434 except historical notes
+- [x] `docker compose up -d db backend` succeeds and `tax-billing-db` reports healthy
+- [x] tax-billing has an `active` postgres entry on 5435 in the global port registry
+- [ ] CLAUDE.md § Gotchas port note updated (5433 → 5434 → 5435 history preserved); PROJECT.md records the allocation
+**Notes:**
