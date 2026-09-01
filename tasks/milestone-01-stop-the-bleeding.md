@@ -19,20 +19,7 @@
 
 ---
 
-### TASK-006: Clean up stale root-owned backup files [`pending`] [`P2`] [`S`]
-**Dependencies:** none
-**Description:** The `backups/` directory contains 8 stale `.json` files owned by `root` from a previous backup implementation. Current code produces `.sql`, so these files are dead artifacts. Removing them requires `sudo` because they were written by the containerized backend's root user via bind mount.
-**Files in scope:**
-- `backups/*.json`
-**Acceptance Criteria:**
-- [ ] `backups/` is empty of stale artifacts
-- [ ] A note in CLAUDE.md § Gotchas about the `root`-ownership footgun (already present — verify)
-**Notes:**
-- Director dispatches this as a user-prompted step: provides the `sudo rm` command, user runs it, task marked complete. Agents do not run sudo.
-
----
-
-### TASK-007: Integration — Milestone 1 verification [`pending`] [`P0`] [`S`]
+### TASK-007: Integration — Milestone 1 verification [`in_progress`] [`P0`] [`S`]
 **Dependencies:** TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-013, TASK-015, TASK-016
 **Description:** End-to-end verification that Milestone 1 left the tool in a working state. Wiring audit per plenary checklist; ensures no orphaned new modules.
 **Acceptance Criteria:**
@@ -265,6 +252,21 @@ Net code change from TASK-014's exploration: **approximately 6 lines** (the clar
 - **PR #16** squash-merged as `379e6be` on main.
 - **PR #18** (the revert) squash-merged as `2f4ab90` on main.
 - **PR #17** (stale bookkeeping claiming TASK-014 shipped) closed without merging.
+
+### Milestone 1: Stop the Bleeding (session 006 — close-out)
+
+**Completed:** 2026-09-01
+**PRs:** none — operational tasks (no code change); bookkeeping direct to main
+
+#### TASK-006: Clean up stale root-owned backup files [`complete`] [`P2`] [`S`]
+**Dependencies:** none
+**Description:** The `backups/` directory contained 8 stale `.json` files owned by `root` from a previous backup implementation. Current code produces `.sql`, so these files were dead artifacts. They were written by the containerized backend's root user via bind mount, so the host user could not delete them without `sudo`.
+**Files in scope:**
+- `backups/*.json`
+**Acceptance Criteria:**
+- [x] `backups/` is empty of stale artifacts — 8 `.json` removed; 12 `.sql` auto-backups (Apr 13 → Sep 1) retained
+- [x] A note in CLAUDE.md § Gotchas about the `root`-ownership footgun (already present — verified; its "TASK-006 will clean up" clause trimmed at bookkeeping)
+**Notes:**
 
 ---
 
