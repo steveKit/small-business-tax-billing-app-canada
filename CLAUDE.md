@@ -1,5 +1,7 @@
 # tax-billing
 
+releasable: false
+
 Personal Canadian sole-proprietor tax-holdback calculator and invoicing
 tool. Single-tenant (one business owner, one user). **L3 security profile**
 — this tool holds authoritative tax math and real client PII.
@@ -160,6 +162,8 @@ tax-billing/
 ## Testing Strategy
 
 Derived from the adaptive testing paradigm in [[PROJECT]].
+
+testing-paradigm: adaptive
 
 - **TDD (test-first):** `backend/app/services/tax_calculator.py` — pure math, clear contracts, the one place a silent bug costs the user real money. Interface is specified before implementation; tests drive the shape.
 - **TDD (test-first):** pydantic validators and any future pure-logic helpers.

@@ -173,6 +173,25 @@ Views:
 Full DDL in `database/schema.sql`. Seed data (CRA 2025/2026 federal +
 Ontario provincial brackets) in `database/seed_data.sql`.
 
+## Runtime Data Flow
+
+_Source of truth for integration wiring: every domain component appears in
+the flow with at least one arrow in and one arrow out. Update whenever the
+pipeline gains, loses, or rewires a component._
+
+```
+TODO: draw the runtime flow. Stub added by /migrate-workflow (v01) on
+2026-09-01 — drawing it is director/architect work, planned for the
+Milestone 3 auth plenary. Unverified sketch to expand:
+
+  Flet views -> api_client (httpx) -> FastAPI routers (/v1/*)
+    -> services (tax_calculator | invoice_pdf | backup_service)
+    -> SQLAlchemy models -> PostgreSQL (tax-billing-db)
+  PDF:    invoice_pdf -> Jinja2 template -> WeasyPrint -> attachment download
+  Backup: clients/payments routers -> backup_service -> pg_dump
+            -> backups/ bind mount + backup_logs row
+```
+
 ## Known Limitations
 
 - **Single-tenant by design.** One business, one user. No multi-tenancy, ever. The tool is built for a sole proprietor, and adding tenancy would fundamentally change the data model.
