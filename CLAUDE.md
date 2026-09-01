@@ -1,6 +1,6 @@
 # tax-billing
 
-workflow-version: 10
+workflow-version: 13
 releasable: false
 
 Personal Canadian sole-proprietor tax-holdback calculator and invoicing
