@@ -53,8 +53,8 @@ The session also reconciled two things that had happened outside the
 handoff chain. First, the task queue was migrated to the indexed
 per-milestone layout on 2026-06-18 (PR #24, `01b1c1b`) with no handoff
 written and no note here — [[TASKS]] is now an index over
-`tasks/milestone-NN-*.md` plus [[tasks/deferred]] and
-[[tasks/discovered]]. Second, **the real Adamson payments were recorded
+`workflow/tasks/milestone-NN-*.md` plus [[workflow/tasks/deferred]] and
+[[workflow/tasks/discovered]]. Second, **the real Adamson payments were recorded
 out of band**: `2026-Adamson-001` and `-002` are both `paid`, which closes
 the P0 reconciliation blocker carried since handoff-005. Newer invoices
 exist (Adamson-003/004/005, BEE-002/003) and `backups/` holds `.sql`
@@ -66,7 +66,7 @@ close-out below.
 `milestone-01-stop-the-bleeding` at `7d42dcb`. Final tally: 10 of 11 tasks
 complete, with **TASK-003 (strong secrets) deferred to Milestone 3** by user
 decision and re-scoped there to a non-destructive rotation (ADR #12;
-[[tasks/deferred]] DEF-001) — the volume holds real financial records and the
+[[workflow/tasks/deferred]] DEF-001) — the volume holds real financial records and the
 original plan required `docker compose down -v`. The close-out ran TASK-006
 (8 dead `.json` backups from the pre-TASK-001 format removed from the
 root-owned `backups/` bind mount via `docker exec`, no host `sudo`) and
@@ -85,7 +85,7 @@ backup files on disk; `backup_retention_count` is never applied). Neither
 task changed code, so there were no PRs in this close-out — bookkeeping went
 direct to main (`1a4000e`, `7d42dcb`). The discovered-work log was triaged
 with the user in full: every open item now carries a target milestone (see
-[[tasks/discovered]]). **Next up: Milestone 02 — Quality Gates**, starting
+[[workflow/tasks/discovered]]). **Next up: Milestone 02 — Quality Gates**, starting
 with TASK-008 (pyproject + ruff). At M2 start the director folds DW-003,
 DW-004, DW-008, DW-010 and DW-011 into the Milestone 2 task definitions.
 
@@ -139,7 +139,7 @@ backing divergent data ([[resource-naming]] § One Canonical Docker Daemon)._
 `postgres_data` volume nor the `tax-billing-network` network is `name:`-pinned,
 so their real identities are prefixed with the *directory basename* — which
 differs inside every worktree and silently forks state. Logged as **DW-009** in
-[[tasks/discovered]].
+[[workflow/tasks/discovered]].
 
 ## Data Model
 
@@ -206,7 +206,7 @@ Milestone 3 auth plenary. Unverified sketch to expand:
 |-----------|--------|--------|-------|
 | 0 — Workflow Scaffold | 2026-04-10 | `complete` | Tag: `milestone-00-workflow-scaffold` |
 | 1 — Stop the Bleeding | 2026-09-01 | `complete` | Tag: `milestone-01-stop-the-bleeding` — 10/11 complete, TASK-003 deferred → M3; + ad-hoc TASK-017/018 |
-| 2 — Quality Gates | — | `active` | Decomposed, not started (see [[tasks/milestone-02-quality-gates]]): pyproject, ruff, mypy, pytest; TDD on tax_calculator; vertical slice |
+| 2 — Quality Gates | — | `active` | Decomposed, not started (see [[workflow/tasks/milestone-02-quality-gates]]): pyproject, ruff, mypy, pytest; TDD on tax_calculator; vertical slice |
 | 3 — Auth (L3) | — | `pending` | Single-user JWT auth, login, router decorator, harden restore endpoint |
 | 4 — Migrations | — | `pending` | Adopt Alembic, convert schema.sql, drop init-volume hack |
 | 5 — Containerize Frontend | — | `pending` | Canonical containerized Flet web; rename frontend task to desktop |

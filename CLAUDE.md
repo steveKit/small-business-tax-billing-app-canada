@@ -28,13 +28,13 @@ Canonical [[wikilink]] targets for this project:
 - [[CLAUDE]] — this file (agent conventions, stack, commands)
 - [[PROJECT]] — status, architecture decisions, milestones
 - [[TASKS]] — milestone index / dashboard
-- [[tasks/milestone-02-quality-gates]] — active milestone (current work queue)
-- [[tasks/milestone-01-stop-the-bleeding]] — completed milestone, frozen archive (tag `milestone-01-stop-the-bleeding`, closed 2026-09-01)
-- [[tasks/deferred]] — task-level deferred / descoped log
-- [[tasks/discovered]] — discovered-work log
+- [[workflow/tasks/milestone-02-quality-gates]] — active milestone (current work queue)
+- [[workflow/tasks/milestone-01-stop-the-bleeding]] — completed milestone, frozen archive (tag `milestone-01-stop-the-bleeding`, closed 2026-09-01)
+- [[workflow/tasks/deferred]] — task-level deferred / descoped log
+- [[workflow/tasks/discovered]] — discovered-work log
 - [[README]] — user-facing setup and usage
-- [[Handoffs/]] — session continuity directory (latest: [[Handoffs/handoff-005]])
-- [[memory/MEMORY]] — stable operational/workflow patterns for this machine
+- [[workflow/handoffs/]] — session continuity directory (latest: [[workflow/handoffs/handoff-005]])
+- [[workflow/memory/MEMORY]] — stable operational/workflow patterns for this machine
 - `security-profile.yaml` — L3 profile for `/security-audit`
 
 ## Commands
@@ -127,7 +127,10 @@ tax-billing/
 ├── .env / .env.example
 ├── security-profile.yaml        # L3
 ├── CLAUDE.md / PROJECT.md / TASKS.md / README.md
-└── Handoffs/
+└── workflow/
+    ├── handoffs/            # session continuity (handoff-NNN.md)
+    ├── tasks/               # milestone files + deferred/discovered logs
+    └── memory/              # MEMORY.md — machine/workflow patterns
 ```
 
 ## Conventions

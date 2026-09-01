@@ -32,11 +32,12 @@ main-branch check — the branch switch has not "happened" from the hook's point
 of view when it inspects the compound command. Always make the branch switch a
 prior, standalone call.
 
-**Note for this project's legacy layout:** the gate's workflow-state allowlist
-is written for the current `workflow/**` layout. tax-billing is still on the
-pre-v10 root-level `tasks/`, `Handoffs/`, `memory/` layout, so a
-`Handoffs/`-only commit may still prompt where a `tasks/`-only one did not —
-use the branch fallback when it does.
+**Layout note:** until 2026-09-01 this project sat on the pre-v10 root-level
+layout (`tasks`, `Handoffs`, `memory` folders at the repo root), which the
+gate's `workflow/**` allowlist did not cover — a handoffs-only commit could
+prompt where a tasks-only one did not. `/migrate-workflow` v10 relocated all
+three under `workflow/` that day, so every workflow-state commit now matches
+the allowlist; the branch fallback is only for sets that include product files.
 
 ## Local environment facts
 

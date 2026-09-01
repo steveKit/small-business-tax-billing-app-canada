@@ -61,9 +61,9 @@ cycles.
 - `TASKS.md` — TASK-017 recorded in Completed Tasks with Notes
 - `PROJECT.md` — Last Updated → 2026-06-10; one-line session-005 note in
   Status
-- `memory/MEMORY.md` — new file; records the bookkeeping-to-main hook
+- `workflow/memory/MEMORY.md` — new file; records the bookkeeping-to-main hook
   workaround pattern
-- `Handoffs/handoff-005.md` — this file
+- `workflow/handoffs/handoff-005.md` — this file
 
 ## Blockers & Open Questions
 
@@ -116,9 +116,9 @@ Reference [[TASKS]] for the full queue context.
   TASK-017 is milestone-independent), Last Updated 2026-06-10
 - [[TASKS]] — § Completed Tasks has the TASK-017 entry; § Milestone 1
   has the 3 remaining user-gated tasks
-- [[Handoffs/handoff-004]] — still the canonical reference for the
+- [[workflow/handoffs/handoff-004]] — still the canonical reference for the
   TASK-003 command sequence and the remaining-M1 detail
-- `memory/MEMORY.md` — bookkeeping-to-main hook workaround (relevant on
+- `workflow/memory/MEMORY.md` — bookkeeping-to-main hook workaround (relevant on
   every handoff/bookkeeping cycle)
 - The TASK-017 change in `backend/app/templates/invoice.html` is minor
   and self-contained; no deep read needed

@@ -3,11 +3,11 @@
 ## Session Summary
 
 End-of-session handoff for the plenary session that bootstrapped the
-`tax-billing` workflow. Supersedes `[[Handoffs/handoff-001]]`, which was
+`tax-billing` workflow. Supersedes `[[workflow/handoffs/handoff-001]]`, which was
 written mid-session before the PRs existed.
 
 **Two PRs merged on `main` this session:**
-- **PR #1** (`f2bed4b`) — `chore(workflow): plenary scaffold for tax-billing` — authored `CLAUDE.md`, `PROJECT.md`, `TASKS.md`, `security-profile.yaml`, `.claude/settings.json`, `Handoffs/handoff-001.md`, and extended `.gitignore`. Reviewer requested 7 changes (2 major, 5 minor), all addressed in fixup commit `b4f382d` before merge.
+- **PR #1** (`f2bed4b`) — `chore(workflow): plenary scaffold for tax-billing` — authored `CLAUDE.md`, `PROJECT.md`, `TASKS.md`, `security-profile.yaml`, `.claude/settings.json`, `workflow/handoffs/handoff-001.md`, and extended `.gitignore`. Reviewer requested 7 changes (2 major, 5 minor), all addressed in fixup commit `b4f382d` before merge.
 - **PR #2** (`6a7a15a`) — `docs(tasks): close Milestone 0` — ticked TASK-000, moved it to Completed Tasks, collapsed the Milestone 0 header to a stub, recorded the tag pointer.
 
 **Milestone 0 tag:** `milestone-00-workflow-scaffold` (annotated, pushed)
@@ -33,13 +33,13 @@ All new files unless noted. See `git diff 81a3886..HEAD --name-status` for the f
 - `TASKS.md` (new, ~281 lines) — Milestone 0 closed; Milestone 1 fully decomposed; Milestones 2-7 sketched
 - `security-profile.yaml` (new, 49 lines) — L3 profile
 - `.claude/settings.json` (new, user-created per hook policy) — read-only mise tasks + ruff/mypy/pytest/pip-read + docker-compose-read + git-read
-- `Handoffs/handoff-001.md` (new) — seed handoff, superseded by this file
-- `Handoffs/handoff-002.md` (new) — this file
+- `workflow/handoffs/handoff-001.md` (new) — seed handoff, superseded by this file
+- `workflow/handoffs/handoff-002.md` (new) — this file
 - `.gitignore` (edited, +17 lines) — tightened secrets patterns, `.claude/worktrees/`
 
 ## Blockers & Open Questions
 
-Carried over from `[[Handoffs/handoff-001]]` — all still live for the next session:
+Carried over from `[[workflow/handoffs/handoff-001]]` — all still live for the next session:
 
 - **TASK-003 is a data-loss event.** Regenerating `.env` credentials requires `docker compose down -v`, which wipes the `postgres_data` volume. **Export current data first** if the tool has real client records. The next session must flag this before starting TASK-002/003.
 - **Stale root-owned files in `backups/`.** Eight `.json` files from a previous backup implementation, un-deletable without elevated privileges. Tracked as TASK-006. Director will provide the removal command; user runs it with root.

@@ -85,7 +85,7 @@ agents.
 - `TASKS.md` — 4 tasks moved to Completed Tasks with full acceptance-criteria ticking and notes; 5 new Discovered Work items added
 - `PROJECT.md` — status paragraph reflects session 003 progress, Milestone 1 now `in_progress`, `backup_logs` table no longer labeled orphaned
 - `CLAUDE.md` — Project Map latest-handoff pointer updated to 003
-- `Handoffs/handoff-003.md` — this file
+- `workflow/handoffs/handoff-003.md` — this file
 
 ## Blockers & Open Questions
 

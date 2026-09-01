@@ -244,7 +244,7 @@ cleanly) was wrong.
   landed; milestones table M1 count moved 4/9 → 5/9 → 6/11 → 7/11 →
   8/11 (ended with 8/11 resolved); `Last Updated` moved from 2026-04-10
   to 2026-04-13
-- `Handoffs/handoff-004.md` — this file
+- `workflow/handoffs/handoff-004.md` — this file
 
 ## Blockers & Open Questions
 
@@ -382,7 +382,7 @@ from handoff-003, with one addition (real payment recording):
   acceptance criteria; § Completed Tasks has the session 004 sub-block
   with full post-mortems on TASK-013/014/015/016 including the
   TASK-014 revert cycle
-- [[Handoffs/handoff-003]] — the handoff-003 TASK-003 command sequence
+- [[workflow/handoffs/handoff-003]] — the handoff-003 TASK-003 command sequence
   is still the canonical reference; only addition is the pre-TASK-003
   fresh pg_dump note
 - `backend/app/routers/invoices.py` — read `ALLOWED_STATUS_TRANSITIONS`

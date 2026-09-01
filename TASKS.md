@@ -6,19 +6,19 @@
 
 ## How this works
 
-- Each milestone has its own file under `tasks/` holding its tasks in full detail.
+- Each milestone has its own file under `workflow/tasks/` holding its tasks in full detail.
 - Future milestones live here as **one-line stubs** until activated. Only the
   **planner** explodes a stub into its milestone file (never the director or
   other agents).
 - Completed tasks stay in their milestone file. When a milestone closes, that
   frozen file is the milestone's permanent archive — there is no separate archive.
-- Two cross-milestone logs: [[tasks/deferred]] and [[tasks/discovered]].
+- Two cross-milestone logs: [[workflow/tasks/deferred]] and [[workflow/tasks/discovered]].
 
 ## Active Milestones
 
 | Milestone | Status | Progress | File |
 |-----------|--------|----------|------|
-| Milestone 02: Quality Gates | `active` | 0/5 tasks (decomposed, not started) | [[tasks/milestone-02-quality-gates]] |
+| Milestone 02: Quality Gates | `active` | 0/5 tasks (decomposed, not started) | [[workflow/tasks/milestone-02-quality-gates]] |
 
 _The milestone file is the source of truth for per-task status. The Progress
 column is a coarse rollup the director updates at task/milestone events — keep it
@@ -36,7 +36,7 @@ loose to avoid index drift._
 
 _For an emergent/feature-driven project this table may be empty or hold a single
 "next" stub; append milestones as features emerge (often promoted from
-[[tasks/discovered]])._
+[[workflow/tasks/discovered]])._
 
 ## Deferred Milestones
 
@@ -46,11 +46,11 @@ _None._
 
 | Milestone | Completed | Tag | File |
 |-----------|-----------|-----|------|
-| Milestone 00: Workflow Scaffold | 2026-04-10 | `milestone-00-workflow-scaffold` | [[tasks/milestone-00-workflow-scaffold]] |
-| Milestone 01: Stop the Bleeding | 2026-09-01 | `milestone-01-stop-the-bleeding` | [[tasks/milestone-01-stop-the-bleeding]] — 10/11 complete, TASK-003 deferred → M03 |
+| Milestone 00: Workflow Scaffold | 2026-04-10 | `milestone-00-workflow-scaffold` | [[workflow/tasks/milestone-00-workflow-scaffold]] |
+| Milestone 01: Stop the Bleeding | 2026-09-01 | `milestone-01-stop-the-bleeding` | [[workflow/tasks/milestone-01-stop-the-bleeding]] — 10/11 complete, TASK-003 deferred → M03 |
 
 ## Logs
 
-- [[tasks/deferred]] — task-level deferred / descoped work, with disposition
+- [[workflow/tasks/deferred]] — task-level deferred / descoped work, with disposition
   (whole-milestone deferral lives in § Deferred Milestones above)
-- [[tasks/discovered]] — discovered-work log (feeds future milestone stubs)
+- [[workflow/tasks/discovered]] — discovered-work log (feeds future milestone stubs)

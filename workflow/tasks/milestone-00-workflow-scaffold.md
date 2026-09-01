@@ -22,14 +22,14 @@ _All tasks complete._
 #### TASK-000: Workflow scaffolding [`complete`] [`P0`] [`M`]
 **Owner:** director + documenter
 **Dependencies:** none
-**Description:** Author the plenary artifacts: `CLAUDE.md`, `PROJECT.md`, `TASKS.md`, `security-profile.yaml`, `.claude/settings.json`, `Handoffs/handoff-001.md`, and extend `.gitignore` for `.claude/worktrees/` and tighter secrets patterns. Non-destructive — no source code touched.
+**Description:** Author the plenary artifacts: `CLAUDE.md`, `PROJECT.md`, `TASKS.md`, `security-profile.yaml`, `.claude/settings.json`, `workflow/handoffs/handoff-001.md`, and extend `.gitignore` for `.claude/worktrees/` and tighter secrets patterns. Non-destructive — no source code touched.
 **Acceptance Criteria:**
 - [x] `CLAUDE.md` present with stack, commands, project map, conventions, gotchas
 - [x] `PROJECT.md` present with status, 9 architecture decisions, data model, milestones table
 - [x] `TASKS.md` present with Milestones 0-1 fully decomposed; Milestones 2-7 sketched
 - [x] `security-profile.yaml` present with L3 level and correct scope flags
 - [x] `.claude/settings.json` present with allow-list for mise/ruff/mypy/pytest/pip/docker
-- [x] `Handoffs/handoff-001.md` present, seeded from this session
+- [x] `workflow/handoffs/handoff-001.md` present, seeded from this session
 - [x] `.gitignore` extended with `.claude/worktrees/` and tighter secrets patterns
 - [x] All files committed on `chore/workflow-scaffold`, PR opened, user merges after review
 **Notes:**
