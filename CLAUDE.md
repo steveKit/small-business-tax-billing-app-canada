@@ -34,7 +34,7 @@ Canonical [[wikilink]] targets for this project:
 - [[workflow/tasks/deferred]] — task-level deferred / descoped log
 - [[workflow/tasks/discovered]] — discovered-work log
 - [[README]] — user-facing setup and usage
-- [[workflow/handoffs/]] — session continuity directory (latest: [[workflow/handoffs/handoff-005]])
+- [[workflow/handoffs/]] — session continuity directory (latest: [[workflow/handoffs/handoff-006]])
 - [[workflow/memory/MEMORY]] — stable operational/workflow patterns for this machine
 - `security-profile.yaml` — L3 profile for `/security-audit`
 

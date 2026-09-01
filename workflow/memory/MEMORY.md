@@ -59,3 +59,22 @@ valid_from: 2026-09-01
   attended session, but a dispatched agent cannot (it cannot self-approve the
   escape-hatch prompt). Agents needing containers up should report the
   limitation rather than retrying; or invoke `docker compose ...` directly.
+
+## GitHub repo settings — protected `main`, squash-only, PR-title subjects
+
+valid_from: 2026-09-01
+
+Applied on user confirmation during the `/migrate-workflow` sync; these are
+server-side facts, so they hold for terminals outside Claude Code too.
+
+- **`protect-main` ruleset is active** on `refs/heads/main`: branch deletion
+  and non-fast-forward (force) pushes are blocked. Require-PR is deliberately
+  NOT enabled — it would break the direct-to-main bookkeeping flow this
+  project relies on. Require-status-checks is likewise off; there is no CI yet
+  (DW-019).
+- **Squash is the only merge method.** Merge commits and rebase merges are
+  disabled, and squash subjects are pinned to `PR_TITLE` with `PR_BODY` as the
+  body. Consequence: a PR title is literally the commit subject that lands on
+  `main`, so it must carry the conventional-commit format and the TASK ID —
+  the branch's own commit subject is no longer used, not even for
+  single-commit PRs.

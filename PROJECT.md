@@ -89,6 +89,25 @@ with the user in full: every open item now carries a target milestone (see
 with TASK-008 (pyproject + ruff). At M2 start the director folds DW-003,
 DW-004, DW-008, DW-010 and DW-011 into the Milestone 2 task definitions.
 
+That same session also brought the project's workflow machinery up to date:
+`/migrate-workflow` ran staged from v0 to **v15**, relocating `Handoffs/`,
+`tasks/` and `memory/` under `workflow/`, stamping `workflow-version: 15`,
+`releasable: false` and `testing-paradigm: adaptive` in [[CLAUDE]], and adding
+the Severity column to [[workflow/tasks/discovered]] plus the Consequences
+column to the decisions table below (every row is still `—`, and § Runtime
+Data Flow is likewise an undrawn stub — both are open work for the Milestone 3
+plenary). The gate-auditor ran as part of the sync and found **11 expected
+gates, 0 present** — by design, since Milestone 2 is their home; the report is
+`docs/reports/gate-audit-2026-09-01.md` and its findings are queued as
+DW-014 through DW-025, including DW-019 (no CI exists at all). The repository
+itself was hardened on user confirmation: the `protect-main` ruleset now blocks
+branch deletion and non-fast-forward pushes on `main`, and merges are
+squash-only with the subject pinned to the PR title and the body to the PR
+body — so a PR title is literally the commit subject that lands on `main`.
+Require-PR and require-status-checks are deliberately off: the first would
+block the bookkeeping-direct-to-main flow, and the second has no CI to check
+yet.
+
 ## Architecture Decisions
 
 | # | Decision | Choice | Rationale | Consequences | Date |
