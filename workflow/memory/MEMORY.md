@@ -60,6 +60,37 @@ valid_from: 2026-09-01
   escape-hatch prompt). Agents needing containers up should report the
   limitation rather than retrying; or invoke `docker compose ...` directly.
 
+## Operating the running stack from a director session
+
+valid_from: 2026-10-07
+
+These recipes come from the first purely operational session (session 007).
+They hold until Milestone 5 containerizes the frontend, and only while the
+current sandbox and hook rules stay as they are.
+
+- **Probe the API from inside the backend container.** The Bash sandbox
+  refuses loopback ([[security]] § Execution Sandbox), so make the request from
+  inside `tax-billing-backend`. Run it as the whole command, because only the
+  bare `docker` command is sandbox-excluded:
+  `docker exec tax-billing-backend python -c "import json,urllib.request; d=json.load(urllib.request.urlopen('http://localhost:8000/v1/invoices')); print(d['total'])"`.
+  `/v1/invoices` returns `{items, total}`. Print only the fields you need,
+  because the `/v1/settings` row carries the owner's PII.
+- **Starting the host-side Flet web UI (`mise run web`).** Run it
+  unsandboxed with `run_in_background`, for two reasons. It
+  `depends = ["up"]`, which wraps compose. And a server bound inside the
+  sandbox's network namespace can't be reached from the host browser.
+- **Stopping it.** Stop it by PID, never by pattern: `python main.py` is too
+  generic for `pkill -f`. Run `pgrep -af 'python main.py'`, pick the PID
+  whose `pwdx <pid>` is `<project>/frontend`, then `kill <pid>`. Its `sh -c`
+  and `mise` parents exit along with it. All three commands run unsandboxed,
+  because the sandbox's PID namespace hides host processes. Use `pwdx` rather
+  than `readlink /proc/$pid/cwd`. The pre-tool-safety hook allows `/proc`
+  reads only when the PID is written as a literal number. A shell-variable
+  PID is blocked as "outside workspace boundary" (workflow brief 2026-10-07).
+- **`docker compose stop` also lists `tax-billing-frontend`.** That is the
+  compose-defined frontend container. It has been exited since 2026-05 and
+  stays dormant until Milestone 5, so this is not an error.
+
 ## GitHub repo settings — protected `main`, squash-only, PR-title subjects
 
 valid_from: 2026-09-01

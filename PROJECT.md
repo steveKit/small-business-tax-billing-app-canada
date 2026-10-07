@@ -4,109 +4,51 @@ See [[CLAUDE]] for agent conventions and [[TASKS]] for the work queue.
 
 ## Status
 
-**Phase:** Hardening — Milestone 1 closed, entering Milestone 2 (Quality Gates)
-**Last Updated:** 2026-09-01
+**Phase:** Hardening. Milestone 1 is closed; Milestone 2 (Quality Gates) is active but not started.
+**Last Updated:** 2026-10-07
 
-The project was built in Feb 2026 as a personal Canadian sole-proprietor
-tax-holdback calculator + invoicing tool. It functioned but was unhardened:
-no auth, no tests, no lint/type-check, hardcoded credentials in committed
-files, a broken auto-backup code path, and an unauthenticated SQL restore
-endpoint. A workflow plenary was held on 2026-04-10 and the project is
-being hardened to L3 for eventual network exposure. Milestone 1 closed the
-worst of that list — credentials extracted to `.env`, the auto-backup path
-fixed, every published port bound to loopback — leaving no auth, no tests,
-no lint/type-check, and the unauthenticated SQL restore endpoint as the
-remaining unhardened surface (Milestones 2 and 3).
+**In flight:** nothing. Milestone 2 is broken into tasks, 0/5 done and all
+`pending` ([[workflow/tasks/milestone-02-quality-gates]]). It starts with
+TASK-008 (pyproject + ruff), which needs a dev-dependency proposal before
+anything is installed. Three user questions are open:
 
-**Milestone 0 (Workflow Scaffold) is complete** as of 2026-04-10 —
-tagged `milestone-00-workflow-scaffold`. Session 003 (2026-04-10) landed
-the first four Milestone 1 tasks: TASK-001 (auto-backup fix), TASK-002
-(credentials extracted to .env), TASK-004 (127.0.0.1 bind), TASK-005
-(utcnow deprecations). Session 004 (2026-04-13) landed TASK-013
-(invoice status bug — payments are source of truth; PR #10, `5a44a4e`),
-TASK-015 (per-client invoice numbering; PR #12, `bd38aed`), TASK-016
-(P0 hotfix — PaymentMethod enum serialization; latent bug surfaced on
-first real payment attempt post-TASK-013; PR #14, `673e4d0`), and
-**TASK-014 (resolved as reverted)** — FilePicker approach shipped in
-PR #16 then reverted in PR #18 (`2f4ab90`) after web-mode testing
-revealed `FilePicker.save_file()` is a no-op in Flet web. Web-mode PDF
-and backup downloads work via the pre-existing `launch_url` approach;
-native Flet desktop mode on WSLg remains broken (platform-level
-`xdg_foreign` limitation — host-side `wslu` setup is the workaround,
-now documented in CLAUDE.md § Gotchas). That session also unblocked
-**payment creation** (TASK-016) and **web-mode PDF/backup downloads**
-(TASK-014 revert), leaving TASK-003, TASK-006 and TASK-007 as the last
-Milestone 1 work.
+- What does "current tax" mean on the dashboard? (gates DW-010 and part of
+  TASK-011)
+- Should self-employed CPP be included in the holdback? (gates the same work)
+- The GitHub repo is public. Should it go private, or should the workflow docs
+  adopt a redaction convention for client identifiers and figures?
 
-Session 005 (2026-06-10) shipped one ad-hoc fix outside the milestone
-track: TASK-017 made the invoice PDF preserve user-entered line breaks
-in the "Description of Work" field (one-line CSS `white-space: pre-wrap;`
-in the WeasyPrint/Jinja2 template). Milestone 1 status is unchanged.
+**Still unhardened:** there is no auth, no tests and no lint/type-check yet
+(Milestones 2 and 3). `POST /v1/backup/restore` is still unauthenticated
+(Milestone 3). There is also no CI, and whether CI joins Milestone 2 is
+undecided (DW-019).
 
-Session 006 (2026-09-01) was unblocking and bookkeeping only. TASK-018
-reallocated the dev database host port 5434 → 5435 after a collision with
-`adamson-next-2025`, the registered owner of 5434 in the global port
-registry; tax-billing's port predated the registry and was unregistered,
-so it was the party that moved — it is registered now, and the allocation
-is mirrored below in § Provisioned Infrastructure (PR #25, `3918b41`).
-The session also reconciled two things that had happened outside the
-handoff chain. First, the task queue was migrated to the indexed
-per-milestone layout on 2026-06-18 (PR #24, `01b1c1b`) with no handoff
-written and no note here — [[TASKS]] is now an index over
-`workflow/tasks/milestone-NN-*.md` plus [[workflow/tasks/deferred]] and
-[[workflow/tasks/discovered]]. Second, **the real Adamson payments were recorded
-out of band**: `2026-Adamson-001` and `-002` are both `paid`, which closes
-the P0 reconciliation blocker carried since handoff-005. Newer invoices
-exist (Adamson-003/004/005, BEE-002/003) and `backups/` holds `.sql`
-auto-backups dated 2026-05-13. Milestone 1's three remaining tasks were
-all user-gated at that point; they were resolved later the same day in the
-close-out below.
+**Next milestone:** Milestone 3, Auth (L3 core). It opens with a focused
+plenary that also draws § Runtime Data Flow and picks up TASK-003 under
+ADR #12.
 
-**Milestone 1 — Stop the Bleeding — closed 2026-09-01**, annotated tag
-`milestone-01-stop-the-bleeding` at `7d42dcb`. Final tally: 10 of 11 tasks
-complete, with **TASK-003 (strong secrets) deferred to Milestone 3** by user
-decision and re-scoped there to a non-destructive rotation (ADR #12;
-[[workflow/tasks/deferred]] DEF-001) — the volume holds real financial records and the
-original plan required `docker compose down -v`. The close-out ran TASK-006
-(8 dead `.json` backups from the pre-TASK-001 format removed from the
-root-owned `backups/` bind mount via `docker exec`, no host `sudo`) and
-TASK-007, the integration verification. TASK-007 was deliberately built to
-avoid destroying real data: the schema was rebuilt from `schema.sql` +
-`seed_data.sql` inside a **throwaway** `postgres:16-alpine` container instead
-of wiping `postgres_data` (9 tables, 2 views, 2025/2026 federal + Ontario
-brackets, `tax_years` seeded), `/health` returned 200, the hardcoded-secrets
-and `utcnow` greps came back clean, and the TASK-013/015/016 regressions were
-confirmed from live production data plus a random-UUID PATCH probe rather
-than a synthetic create/delete cycle that would have left test invoices in
-real books. The wiring audit found nothing Milestone 1 introduced to be
-orphaned; it did surface two **pre-existing** issues, logged as DW-012
-(unreferenced pydantic schemas) and DW-013 (`backup_logs` rows outnumber
-backup files on disk; `backup_retention_count` is never applied). Neither
-task changed code, so there were no PRs in this close-out — bookkeeping went
-direct to main (`1a4000e`, `7d42dcb`). The discovered-work log was triaged
-with the user in full: every open item now carries a target milestone (see
-[[workflow/tasks/discovered]]). **Next up: Milestone 02 — Quality Gates**, starting
-with TASK-008 (pyproject + ruff). At M2 start the director folds DW-003,
-DW-004, DW-008, DW-010 and DW-011 into the Milestone 2 task definitions.
+**Recent notable changes:**
 
-That same session also brought the project's workflow machinery up to date:
-`/migrate-workflow` ran staged from v0 to **v15**, relocating `Handoffs/`,
-`tasks/` and `memory/` under `workflow/`, stamping `workflow-version: 15`,
-`releasable: false` and `testing-paradigm: adaptive` in [[CLAUDE]], and adding
-the Severity column to [[workflow/tasks/discovered]] plus the Consequences
-column to the decisions table below (every row is still `—`, and § Runtime
-Data Flow is likewise an undrawn stub — both are open work for the Milestone 3
-plenary). The gate-auditor ran as part of the sync and found **11 expected
-gates, 0 present** — by design, since Milestone 2 is their home; the report is
-`docs/reports/gate-audit-2026-09-01.md` and its findings are queued as
-DW-014 through DW-025, including DW-019 (no CI exists at all). The repository
-itself was hardened on user confirmation: the `protect-main` ruleset now blocks
-branch deletion and non-fast-forward pushes on `main`, and merges are
-squash-only with the subject pinned to the PR title and the body to the PR
-body — so a PR title is literally the commit subject that lands on `main`.
-Require-PR and require-status-checks are deliberately off: the first would
-block the bookkeeping-direct-to-main flow, and the second has no CI to check
-yet.
+- **2026-10-07 (session 007).** An operational session with no code changes.
+  The business address was updated as data in Settings, and invoice
+  `2026-CACEA-001` was issued and marked `pending`. No task, decision or file
+  changed.
+- **2026-09-01 (session 006).** Milestone 1 closed at 10/11 (tag
+  `milestone-01-stop-the-bleeding`). TASK-003 was deferred to Milestone 3 and
+  re-scoped as a non-destructive rotation (ADR #12, [[workflow/tasks/deferred]]
+  DEF-001).
+- **2026-09-01.** TASK-018 moved the dev DB host port from 5434 to 5435 after
+  a port-registry collision (ADR #11, PR #25).
+- **2026-09-01.** `/migrate-workflow` synced the project from v0 to v15 and
+  moved workflow state under `workflow/`. The gate audit found 11 expected
+  gates and 0 present; its findings are queued as DW-014 through DW-025
+  (`docs/reports/gate-audit-2026-09-01.md`).
+- **2026-09-01.** The repo was hardened: a `protect-main` ruleset, and
+  squash-only merges that take the commit subject from the PR title (see
+  [[workflow/memory/MEMORY]]).
+
+Earlier history is in [[workflow/handoffs/INDEX]], the per-task Notes in each
+milestone file, and `git log`.
 
 ## Architecture Decisions
 
