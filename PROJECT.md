@@ -7,8 +7,9 @@ See [[CLAUDE]] for agent conventions and [[TASKS]] for the work queue.
 **Phase:** Hardening. Milestone 1 is closed; Milestone 2 (Quality Gates) is active but not started.
 **Last Updated:** 2026-10-07
 
-**In flight:** nothing. Milestone 2 is broken into tasks, 0/5 done and all
-`pending` ([[workflow/tasks/milestone-02-quality-gates]]). It starts with
+**In flight:** nothing. Milestone 2 is broken into tasks, 0/6 done and all
+`pending` ([[workflow/tasks/milestone-02-quality-gates]]); TASK-019 (Dependabot
+bumps, P2) was added 2026-10-07. It starts with
 TASK-008 (pyproject + ruff), which needs a dev-dependency proposal before
 anything is installed. Three user questions are open:
 

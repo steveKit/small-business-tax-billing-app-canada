@@ -55,6 +55,18 @@
 - [ ] `mise run smoke` task added
 - [ ] Test passes from a freshly-seeded DB
 
+### TASK-019: Bump vulnerable backend dependencies (Dependabot alerts) [`pending`] [`P2`] [`M`]
+**Dependencies:** TASK-008
+**Description:** GitHub reports 17 open Dependabot alerts on `main`, all in the backend dependency set (surfaced 2026-10-07 in the push response; verified at source via `gh api repos/{owner}/{repo}/dependabot/alerts?state=open`). Bump the pins in `backend/pyproject.toml` (post-TASK-008): `python-multipart` 0.0.9 → ≥ 0.0.31 (4 HIGH, 1 MED, 3 LOW); `python-jose` 3.3.0 → ≥ 3.4.0 (1 CRIT, 1 MED — declared but unused until M3); `weasyprint` 60.2 → ≥ 70.0 (1 HIGH, 2 MED; a major bump — `pydyf` 0.8.0 must move with it); `jinja2` 3.1.4 → ≥ 3.1.6 (3 MED); `pytest` 8.3.3 → ≥ 9.0.3 (1 MED; coordinate with TASK-010's `pytest-asyncio` pin). Blast radius is limited today — loopback-only, single user (user decision 2026-10-07) — hence P2; the L3 profile and TASK-008's re-pin make M2 the natural home. Version bumps of existing deps need no new-dep proposal, but the PR takes full review: the weasyprint major bump touches invoice PDF output.
+**Acceptance Criteria:**
+- [ ] `python-multipart` ≥ 0.0.31, `python-jose` ≥ 3.4.0, `jinja2` ≥ 3.1.6, `pytest` ≥ 9.0.3 pinned exactly in `backend/pyproject.toml`
+- [ ] `weasyprint` ≥ 70.0 with a compatible `pydyf` pin; an existing invoice PDF renders without error and the TASK-017 `white-space: pre-wrap` behavior is preserved (visual check against a pre-bump render)
+- [ ] Backend image rebuilds; `/health` returns 200; existing tests green
+- [ ] `gh api …/dependabot/alerts?state=open` shows no alerts other than advisories with no patched version (GHSA-jhhc-3hcp-qhm5 at filing time)
+- [ ] The pre/post-bump render check uses live data read-only — no synthetic invoices created in the real books
+**Notes:**
+- Origin: [[workflow/tasks/discovered]] DW-026, filed from session 007 ([[workflow/handoffs/handoff-007]]).
+
 ---
 
 ## Completed Tasks (this milestone)

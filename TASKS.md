@@ -18,7 +18,7 @@
 
 | Milestone | Status | Progress | File |
 |-----------|--------|----------|------|
-| Milestone 02: Quality Gates | `active` | 0/5 tasks (decomposed, not started) | [[workflow/tasks/milestone-02-quality-gates]] |
+| Milestone 02: Quality Gates | `active` | 0/6 tasks (decomposed, not started) | [[workflow/tasks/milestone-02-quality-gates]] |
 
 _The milestone file is the source of truth for per-task status. The Progress
 column is a coarse rollup the director updates at task/milestone events — keep it
