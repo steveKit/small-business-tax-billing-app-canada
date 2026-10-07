@@ -32,8 +32,9 @@ ADR #12.
 
 - **2026-10-07 (session 007).** An operational session with no code changes.
   The business address was updated as data in Settings, and invoice
-  `2026-CACEA-001` was issued and marked `pending`. No task, decision or file
-  changed.
+  `2026-CACEA-001` was issued and marked `pending`. The handoff push surfaced
+  17 Dependabot alerts on the backend pins, filed as TASK-019 (P2, DW-026); no
+  product code changed.
 - **2026-09-01 (session 006).** Milestone 1 closed at 10/11 (tag
   `milestone-01-stop-the-bleeding`). TASK-003 was deferred to Milestone 3 and
   re-scoped as a non-destructive rotation (ADR #12, [[workflow/tasks/deferred]]

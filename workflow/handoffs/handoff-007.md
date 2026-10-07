@@ -7,9 +7,11 @@
 ## Session Summary
 
 This was an operational session, not a development one: the user ran the tool
-for day-to-day business. Branch `main` stayed at `9f53f95` = `origin/main` with
-a clean tree. There were no commits and no PRs, and no task was started.
-Milestone 2 is still 0/5, all `pending`
+for day-to-day business. There were no product-code commits and no PRs, and no
+task was started. Two bookkeeping commits went direct to `main` and were
+pushed: `f8ac09d` (the first version of this handoff) and `e62b8dd` (the
+TASK-019 filing). Before this revision, `main` = `origin/main` at `e62b8dd`
+with a clean tree. Milestone 2 is now 0/6, all `pending`
 ([[workflow/tasks/milestone-02-quality-gates]]).
 
 - The stack was started with `docker compose up -d db backend` and
@@ -27,12 +29,38 @@ Milestone 2 is still 0/5, all `pending`
   directory, then `docker compose stop` ran. The data volume was not touched.
   The recipes are in [[workflow/memory/MEMORY]] § Operating the running stack
   from a director session.
+- Pushing `f8ac09d` returned GitHub's Dependabot banner: 17 open alerts on
+  `main`, all in `backend/requirements.txt` (1 critical, 5 high, 8 medium,
+  3 low, across `python-jose`, `python-multipart`, `weasyprint`, `jinja2` and
+  `pytest`). The director read them at source through the Dependabot alerts
+  API. One weasyprint medium (GHSA-jhhc-3hcp-qhm5) has no patched version yet.
+  The user chose to file this as a task at reduced priority, because the tool
+  runs loopback-only for one user, so the blast radius is small. It became
+  **TASK-019** `[P2]` in [[workflow/tasks/milestone-02-quality-gates]], with
+  provenance row DW-026 in [[workflow/tasks/discovered]]
+  (`promoted → TASK-019`).
 
 ## Files Changed
 
-- None. `git diff --name-status` against the session base (`9f53f95`) is
-  empty, because this session changed data in the running database and no
-  files.
+- `workflow/handoffs/handoff-007.md` — this handoff, first written at
+  `f8ac09d` and revised in place to cover the TASK-019 tail
+- `workflow/handoffs/INDEX.md` — handoff-007 row appended, then its summary
+  refreshed for the TASK-019 tail
+- `PROJECT.md` — § Status rewritten for this session, then its in-flight line
+  moved to 0/6 with a TASK-019 mention
+- `workflow/memory/MEMORY.md` — new section, Operating the running stack from
+  a director session
+- `CLAUDE.md` — Project Map "Latest handoff" pointer moved to handoff-007
+- `workflow/tasks/milestone-02-quality-gates.md` — TASK-019 block added after
+  TASK-012
+- `workflow/tasks/discovered.md` — DW-026 row added (severity `next`,
+  promoted to TASK-019)
+- `TASKS.md` — Milestone 2 rollup moved from 0/5 to 0/6
+
+This list is `git diff --name-status 9f53f95 e62b8dd` against the session
+base. No product code changed: no `.py`, compose or template file. The
+address update and the new invoice are data in the running database, not
+files.
 
 ## Blockers & Open Questions
 
@@ -70,8 +98,11 @@ Milestone 2 is still 0/5, all `pending`
 3. **Milestone 2, in order:** TASK-008 (dev-dep proposal first; fold in
    DW-003 `.gitattributes`, DW-004, and DW-022's tier block plus a home for
    the frontend linter), then TASK-009/010, then TASK-011 (TDD; read
-   `backend/app/services/tax_calculator.py` first), then TASK-012. Separately,
-   decide whether a CI task (the DW-019/014/015/018 cluster) joins M2.
+   `backend/app/services/tax_calculator.py` first), then TASK-012, then
+   TASK-019 (the Dependabot bumps). TASK-019 depends on TASK-008 because the
+   pins land in the `backend/pyproject.toml` that TASK-008 creates. It is P2
+   because the tool is loopback-only with one user. Separately, decide whether
+   a CI task (the DW-019/014/015/018 cluster) joins M2.
 4. **Optional, cheap:** correct the seven defaulted DW severities and enrich
    the four ADR Consequences cells.
 5. **Later:** the Milestone 3 plenary draws § Runtime Data Flow and picks up
